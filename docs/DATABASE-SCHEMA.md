@@ -1,8 +1,8 @@
-# FratFinance Database Schema
+# StackSmart Database Schema
 
 ## Overview
 
-This document describes the database schema for FratFinance, which runs on Supabase PostgreSQL. The schema is designed to store user authentication data, financial plans, and Plaid account connections while enforcing strict privacy through Row Level Security (RLS).
+This document describes the database schema for StackSmart, which runs on Supabase PostgreSQL. The schema is designed to store user authentication data, financial plans, and Plaid account connections while enforcing strict privacy through Row Level Security (RLS).
 
 ## Table Definitions
 
@@ -114,7 +114,7 @@ This document describes the database schema for FratFinance, which runs on Supab
 
 Row Level Security is PostgreSQL's built-in feature that enforces row-level access control. At the database layer, each row is protected by policies that determine who can SELECT, INSERT, UPDATE, or DELETE that row.
 
-### Why RLS is Critical for FratFinance
+### Why RLS is Critical for StackSmart
 
 1. **User Privacy**: Users absolutely cannot see other users' financial data, even if they somehow know their user IDs
 2. **Data Protection**: The database enforces privacy rules, not just the application - this protects against application bugs
@@ -143,7 +143,7 @@ This policy says: "For SELECT operations, only show rows where the authenticated
 ### Option 1: Using Supabase SQL Editor (Recommended for Development)
 
 1. Log into your [Supabase Dashboard](https://app.supabase.com)
-2. Select your FratFinance project
+2. Select your StackSmart project
 3. Go to **SQL Editor** in the left sidebar
 4. Click **New Query**
 5. Copy the entire contents of `backend/migrations/001_create_schema.sql`

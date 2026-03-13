@@ -248,7 +248,7 @@ curl http://localhost:8000/api/market/voo-live
 
 ### 1. View Test Page
 ```bash
-xdg-open /home/shane/Development/FratFinance/FratFinance/net-worth-optimizer/test_market_data.html
+xdg-open /home/shane/Development/StackSmart/StackSmart/net-worth-optimizer/test_market_data.html
 ```
 
 ### 2. View Dashboard

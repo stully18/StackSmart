@@ -1,6 +1,6 @@
 # Environment Configuration Setup
 
-This guide explains how to set up environment variables for the FratFinance application (frontend and backend).
+This guide explains how to set up environment variables for the StackSmart application (frontend and backend).
 
 ## Overview
 

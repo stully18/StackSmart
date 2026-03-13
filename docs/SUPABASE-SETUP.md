@@ -1,6 +1,6 @@
-# Supabase Setup Guide for FratFinance
+# Supabase Setup Guide for StackSmart
 
-This guide walks you through creating a Supabase project and configuring it for FratFinance authentication. Even if you're not technical, follow these steps exactly and you'll have everything working.
+This guide walks you through creating a Supabase project and configuring it for StackSmart authentication. Even if you're not technical, follow these steps exactly and you'll have everything working.
 
 ## What is Supabase?
 
@@ -31,7 +31,7 @@ Supabase is an open-source Firebase alternative that provides:
 
 1. On the Supabase dashboard, click **"New Project"** (or similar)
 2. You'll see a project creation form. Fill it out:
-   - **Project Name**: `FratFinance` (or any name you prefer)
+   - **Project Name**: `StackSmart` (or any name you prefer)
    - **Database Password**: Create a strong password like `YourSecurePassword123!` and SAVE THIS
    - **Region**: Pick the region closest to you (e.g., `us-east-1` for East Coast, `us-west-1` for West Coast)
    - **Pricing Plan**: Select **Free** tier
@@ -46,7 +46,7 @@ Once your project is created, follow these steps to find your credentials:
 
 #### Finding Your Credentials:
 
-1. Click on your project name (e.g., "FratFinance") in the dashboard
+1. Click on your project name (e.g., "StackSmart") in the dashboard
 2. On the left sidebar, go to **Settings** (gear icon at the bottom)
 3. Click on **API** in the Settings menu
 4. You'll see a section labeled **"Project API keys"**

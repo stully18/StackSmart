@@ -61,7 +61,7 @@ export default function LoginForm() {
         {/* Logo/Title */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-semibold tracking-tight text-zinc-50 mb-2">
-            FratFinance
+            StackSmart
           </h1>
           <p className="text-zinc-500">Sign in to your account</p>
         </div>

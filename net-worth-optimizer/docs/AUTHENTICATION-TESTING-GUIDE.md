@@ -1,6 +1,6 @@
 # Authentication Testing Guide
 
-A complete testing guide for the FratFinance authentication system. This document outlines how to manually test every authentication flow in the application.
+A complete testing guide for the StackSmart authentication system. This document outlines how to manually test every authentication flow in the application.
 
 ## Prerequisites
 

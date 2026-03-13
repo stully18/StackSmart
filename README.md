@@ -1,4 +1,4 @@
-# FratFinance - Net Worth Optimizer
+# StackSmart - Net Worth Optimizer
 
 A web application that helps college students make mathematically optimal financial decisions: should they pay off debt or invest their spare cash?
 
@@ -74,7 +74,7 @@ graph TD
 
 ```bash
 git clone <repo-url>
-cd FratFinance
+cd StackSmart
 ```
 
 #### 2. Set up Supabase
@@ -130,7 +130,7 @@ The frontend will start at `http://localhost:3000`
 
 ## User Accounts & Authentication
 
-FratFinance includes **secure user authentication** powered by Supabase.
+StackSmart includes **secure user authentication** powered by Supabase.
 
 ### Authentication Features
 
@@ -163,7 +163,7 @@ FratFinance includes **secure user authentication** powered by Supabase.
 ## Project Structure
 
 ```
-FratFinance/
+StackSmart/
 ├── README.md
 ├── docs/
 │   ├── DATABASE-SCHEMA.md

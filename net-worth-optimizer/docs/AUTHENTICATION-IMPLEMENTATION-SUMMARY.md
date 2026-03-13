@@ -1,6 +1,6 @@
 # Authentication Implementation Summary
 
-Complete overview of the Supabase authentication system implemented for FratFinance.
+Complete overview of the Supabase authentication system implemented for StackSmart.
 
 ## What Was Built
 
@@ -11,7 +11,7 @@ A complete, production-ready authentication system that allows users to:
 - Manage their profile and security settings
 - Use their financial data securely
 
-The authentication system integrates Supabase (BaaS) with the FratFinance application to provide secure user accounts and session management.
+The authentication system integrates Supabase (BaaS) with the StackSmart application to provide secure user accounts and session management.
 
 ---
 
@@ -209,7 +209,7 @@ auth.users -- Managed by Supabase auth system
   - raw_user_meta_data (jsonb) -- stores full_name
   - ... (other fields)
 
--- Created for FratFinance
+-- Created for StackSmart
 users_public (public table, RLS enabled)
   - id (UUID, foreign key to auth.users)
   - email (text)
@@ -610,4 +610,4 @@ If you encounter issues:
 
 ---
 
-**Authentication System Complete!** All users can now create accounts, sign in securely, and access protected features of FratFinance.
+**Authentication System Complete!** All users can now create accounts, sign in securely, and access protected features of StackSmart.

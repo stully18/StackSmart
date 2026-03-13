@@ -6,7 +6,7 @@ Having trouble with the SQL Editor? No problem! Follow this visual guide.
 
 1. Go to https://app.supabase.com
 2. Sign in with your account
-3. Click on your **FratFinance** project
+3. Click on your **StackSmart** project
 
 You should see this screen:
 
@@ -299,7 +299,7 @@ AND table_name IN ('users_public', 'financial_data', 'plaid_accounts');
 
 ```
 ☐ I opened https://app.supabase.com
-☐ I selected my FratFinance project
+☐ I selected my StackSmart project
 ☐ I clicked "SQL Editor" in the left sidebar
 ☐ I clicked "+ New Query"
 ☐ I copied the SQL from the file or guide above

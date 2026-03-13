@@ -34,7 +34,7 @@ export default function Navigation() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
           <span className="text-[1.15rem] font-semibold tracking-tight text-zinc-50 transition-colors group-hover:text-white">
-            FratFinance
+            StackSmart
           </span>
         </Link>
 
