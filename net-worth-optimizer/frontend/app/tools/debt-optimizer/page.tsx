@@ -112,7 +112,8 @@ export default function DebtOptimizerPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Optimization failed');
+        const errorText = await response.text();
+        throw new Error(`Optimization failed: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();

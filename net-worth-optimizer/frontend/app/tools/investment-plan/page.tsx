@@ -101,7 +101,8 @@ export default function InvestmentPlanPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate plan');
+        const errorText = await response.text();
+        throw new Error(`Failed to generate plan: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
