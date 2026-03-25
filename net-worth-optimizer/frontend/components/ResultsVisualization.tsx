@@ -77,7 +77,7 @@ export default function ResultsVisualization({
       legend: {
         position: 'top' as const,
         labels: {
-          color: 'rgb(161, 161, 170)',
+          color: 'rgb(148, 163, 184)',
           font: {
             size: 13,
             weight: 'normal'
@@ -89,7 +89,7 @@ export default function ResultsVisualization({
       title: {
         display: true,
         text: 'Net Worth Projection Over Time',
-        color: 'rgb(244, 244, 245)',
+        color: 'rgb(248, 250, 252)',
         font: {
           size: 16,
           weight: 'normal'
@@ -99,10 +99,10 @@ export default function ResultsVisualization({
         }
       },
       tooltip: {
-        backgroundColor: 'rgba(9, 9, 11, 0.95)',
-        titleColor: 'rgb(244, 244, 245)',
-        bodyColor: 'rgb(161, 161, 170)',
-        borderColor: 'rgb(63, 63, 70)',
+        backgroundColor: 'rgba(2, 6, 23, 0.95)',
+        titleColor: 'rgb(248, 250, 252)',
+        bodyColor: 'rgb(148, 163, 184)',
+        borderColor: 'rgb(51, 65, 85)',
         borderWidth: 1,
         padding: 12,
         displayColors: true,
@@ -124,36 +124,36 @@ export default function ResultsVisualization({
     scales: {
       y: {
         ticks: {
-          color: 'rgb(113, 113, 122)',
+          color: 'rgb(100, 116, 139)',
           callback: function(value) {
             return '$' + Number(value).toLocaleString();
           }
         },
         grid: {
-          color: 'rgba(63, 63, 70, 0.3)'
+          color: 'rgba(51, 65, 85, 0.3)'
         }
       },
       x: {
         ticks: {
-          color: 'rgb(113, 113, 122)',
+          color: 'rgb(100, 116, 139)',
           maxTicksLimit: 12
         },
         grid: {
-          color: 'rgba(63, 63, 70, 0.3)'
+          color: 'rgba(51, 65, 85, 0.3)'
         }
       }
     }
   };
 
   return (
-    <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 h-full flex flex-col">
+    <div className="bg-surface p-6 rounded-xl border border-border-subtle h-full flex flex-col">
       <div className="flex-1 min-h-0">
         <Line data={chartData} options={options} />
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="p-3 bg-zinc-800/50 border border-zinc-800 rounded-lg">
-          <div className="text-xs text-zinc-500 mb-1">Pay Debt Path</div>
-          <div className="text-lg font-semibold text-red-400">
+        <div className="p-3 bg-surface-elevated/50 border border-border-subtle rounded-lg">
+          <div className="text-xs text-text-muted mb-1">Pay Debt Path</div>
+          <div className="text-lg font-semibold text-destructive">
             {new Intl.NumberFormat('en-US', {
               style: 'currency',
               currency: 'USD',
@@ -161,9 +161,9 @@ export default function ResultsVisualization({
             }).format(monthlyBreakdown[monthlyBreakdown.length - 1].debt_path_net_worth)}
           </div>
         </div>
-        <div className="p-3 bg-zinc-800/50 border border-zinc-800 rounded-lg">
-          <div className="text-xs text-zinc-500 mb-1">Invest Path</div>
-          <div className="text-lg font-semibold text-green-400">
+        <div className="p-3 bg-surface-elevated/50 border border-border-subtle rounded-lg">
+          <div className="text-xs text-text-muted mb-1">Invest Path</div>
+          <div className="text-lg font-semibold text-success">
             {new Intl.NumberFormat('en-US', {
               style: 'currency',
               currency: 'USD',

@@ -50,11 +50,11 @@ export default function SignUpForm() {
   const getStrengthColor = (): string => {
     switch (passwordStrength) {
       case 'weak':
-        return 'bg-red-500'
+        return 'bg-destructive'
       case 'good':
-        return 'bg-amber-500'
+        return 'bg-warning'
       case 'strong':
-        return 'bg-green-500'
+        return 'bg-success'
     }
   }
 
@@ -62,11 +62,11 @@ export default function SignUpForm() {
   const getStrengthLabel = (): [string, string] => {
     switch (passwordStrength) {
       case 'weak':
-        return ['Weak', 'text-red-400']
+        return ['Weak', 'text-destructive']
       case 'good':
-        return ['Good', 'text-amber-400']
+        return ['Good', 'text-warning']
       case 'strong':
-        return ['Strong', 'text-green-400']
+        return ['Strong', 'text-success']
     }
   }
 
@@ -147,19 +147,19 @@ export default function SignUpForm() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl shadow-black/40 p-8">
+      <div className="bg-surface border border-border-subtle rounded-xl shadow-2xl shadow-black/60 p-8">
         {/* Logo/Title */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-semibold tracking-tight text-zinc-50 mb-2">
+          <h1 className="text-4xl font-semibold tracking-tight text-text-primary mb-2">
             StackSmart
           </h1>
-          <p className="text-zinc-500">Create your account</p>
+          <p className="text-text-muted">Create your account</p>
         </div>
 
         {/* Submit Error Message */}
         {errors.submit && (
-          <div className="mb-6 p-4 bg-zinc-900 border-l-4 border-red-500 rounded-lg">
-            <p className="text-red-400 text-sm font-medium">{errors.submit}</p>
+          <div className="mb-6 p-4 bg-surface border-l-4 border-destructive rounded-lg">
+            <p className="text-destructive text-sm font-medium">{errors.submit}</p>
           </div>
         )}
 
@@ -167,7 +167,7 @@ export default function SignUpForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Full Name Input */}
           <div>
-            <label htmlFor="fullName" className="block text-sm font-medium text-zinc-400 mb-2">
+            <label htmlFor="fullName" className="block text-sm font-medium text-text-secondary mb-2">
               Full Name
             </label>
             <input
@@ -176,17 +176,17 @@ export default function SignUpForm() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="John Doe"
-              className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+              className="w-full px-4 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
               disabled={isLoading}
             />
             {errors.fullName && (
-              <p className="text-red-400 text-sm mt-1">{errors.fullName}</p>
+              <p className="text-destructive text-sm mt-1">{errors.fullName}</p>
             )}
           </div>
 
           {/* Email Input */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-zinc-400 mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-2">
               Email Address
             </label>
             <input
@@ -195,17 +195,17 @@ export default function SignUpForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+              className="w-full px-4 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
               disabled={isLoading}
             />
             {errors.email && (
-              <p className="text-red-400 text-sm mt-1">{errors.email}</p>
+              <p className="text-destructive text-sm mt-1">{errors.email}</p>
             )}
           </div>
 
           {/* Password Input */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-zinc-400 mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-text-secondary mb-2">
               Password
             </label>
             <input
@@ -214,21 +214,21 @@ export default function SignUpForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
-              className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+              className="w-full px-4 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
               disabled={isLoading}
             />
             {errors.password && (
-              <p className="text-red-400 text-sm mt-1">{errors.password}</p>
+              <p className="text-destructive text-sm mt-1">{errors.password}</p>
             )}
 
             {/* Password Strength Indicator */}
             {password && (
               <div className="mt-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-zinc-500">Password strength:</span>
+                  <span className="text-xs font-medium text-text-muted">Password strength:</span>
                   <span className={`text-xs font-semibold ${strengthLabel}`}>{strength}</span>
                 </div>
-                <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                <div className="w-full bg-surface-elevated rounded-full h-1.5 overflow-hidden">
                   <div
                     className={`h-full ${getStrengthColor()} transition-all duration-300 ${strengthWidth}`}
                   />
@@ -239,7 +239,7 @@ export default function SignUpForm() {
 
           {/* Confirm Password Input */}
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-zinc-400 mb-2">
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-text-secondary mb-2">
               Confirm Password
             </label>
             <input
@@ -248,11 +248,11 @@ export default function SignUpForm() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm your password"
-              className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+              className="w-full px-4 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
               disabled={isLoading}
             />
             {errors.confirmPassword && (
-              <p className="text-red-400 text-sm mt-1">{errors.confirmPassword}</p>
+              <p className="text-destructive text-sm mt-1">{errors.confirmPassword}</p>
             )}
           </div>
 
@@ -260,7 +260,7 @@ export default function SignUpForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
+            className="w-full px-4 py-2 btn-gradient text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:bg-surface-elevated disabled:text-text-muted disabled:cursor-not-allowed disabled:bg-none transition-colors active:scale-[0.98]"
           >
             {isLoading ? 'Creating account...' : 'Sign Up'}
           </button>
@@ -268,11 +268,11 @@ export default function SignUpForm() {
 
         {/* Sign In Link */}
         <div className="mt-6 text-center">
-          <p className="text-zinc-500">
+          <p className="text-text-muted">
             Already have an account?{' '}
             <Link
               href="/auth/login"
-              className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+              className="text-primary hover:text-primary-hover font-semibold transition-colors"
             >
               Sign in
             </Link>

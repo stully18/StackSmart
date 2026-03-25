@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { ArrowLeft, FileText, CreditCard, TrendingUp, Rocket, BarChart3, Check } from 'lucide-react';
 import type { Loan, LoanType, MultiLoanRequest, MultiLoanResult, MarketAssumptions } from '@/types';
 import { useFinancialData } from '../../context/FinancialContext';
 import { useAuth } from '../../context/AuthContext';
@@ -160,91 +161,89 @@ export default function DebtOptimizerPage() {
   // Show loading while checking authentication, or if not authenticated
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          <p className="text-zinc-500 mt-4">Loading...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-text-muted mt-4">Loading...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white p-8">
+    <div className="min-h-screen bg-background text-white p-8">
       <div className="max-w-6xl mx-auto">
         {/* Back to Tools */}
         <div className="mb-6">
           <Link
             href="/tools"
-            className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 transition-colors w-fit"
+            className="flex items-center gap-2 text-text-muted hover:text-text-secondary transition-colors w-fit"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
+            <ArrowLeft size={20} />
             Back to Tools
           </Link>
         </div>
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-semibold tracking-tight text-zinc-50 mb-2">
+          <h1 className="text-4xl font-semibold tracking-tight text-text-primary mb-2">
             Debt Optimizer
           </h1>
-          <p className="text-zinc-500">Add your loans and see which debts to pay first vs investing</p>
+          <p className="text-text-muted">Add your loans and see which debts to pay first vs investing</p>
 
           {/* Live Market Data */}
           {vooData && !vooData.error && (
-            <div className="mt-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl">
+            <div className="mt-4 p-4 bg-surface border border-border-subtle rounded-xl">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-zinc-500">Live Market Data:</span>
-                  <span className="font-semibold text-zinc-100">VOO ${vooData.price.toFixed(2)}</span>
-                  <span className={`text-sm font-semibold ${vooData.change_percent_today >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className="text-sm text-text-muted">Live Market Data:</span>
+                  <span className="font-semibold text-text-primary">VOO ${vooData.price.toFixed(2)}</span>
+                  <span className={`text-sm font-semibold ${vooData.change_percent_today >= 0 ? 'text-success' : 'text-destructive'}`}>
                     {vooData.change_percent_today >= 0 ? '↑' : '↓'} {Math.abs(vooData.change_percent_today).toFixed(2)}% today
                   </span>
                 </div>
                 <div className="flex gap-6 text-sm">
                   {vooData.ytd_return !== null && (
                     <div>
-                      <span className="text-zinc-500">YTD: </span>
-                      <span className={vooData.ytd_return >= 0 ? 'text-green-400' : 'text-red-400'}>
+                      <span className="text-text-muted">YTD: </span>
+                      <span className={vooData.ytd_return >= 0 ? 'text-success' : 'text-destructive'}>
                         {vooData.ytd_return >= 0 ? '+' : ''}{vooData.ytd_return.toFixed(1)}%
                       </span>
                     </div>
                   )}
                   {vooData.one_year_return !== null && (
                     <div>
-                      <span className="text-zinc-500">1-Year: </span>
-                      <span className={vooData.one_year_return >= 0 ? 'text-green-400' : 'text-red-400'}>
+                      <span className="text-text-muted">1-Year: </span>
+                      <span className={vooData.one_year_return >= 0 ? 'text-success' : 'text-destructive'}>
                         {vooData.one_year_return >= 0 ? '+' : ''}{vooData.one_year_return.toFixed(1)}%
                       </span>
                     </div>
                   )}
                   <div>
-                    <span className="text-zinc-500">Historical Avg: </span>
-                    <span className="text-blue-400">~{vooData.five_year_avg_return.toFixed(0)}%/yr</span>
+                    <span className="text-text-muted">Historical Avg: </span>
+                    <span className="text-primary">~{vooData.five_year_avg_return.toFixed(0)}%/yr</span>
                   </div>
                 </div>
-                <div className="text-xs text-zinc-600">
+                <div className="text-xs text-text-muted/70">
                   Source: {vooData.data_source}
                 </div>
               </div>
             </div>
           )}
           {marketDataLoading && (
-            <div className="mt-4 p-4 bg-zinc-900 border border-zinc-800 rounded-xl text-center text-zinc-500">
+            <div className="mt-4 p-4 bg-surface border border-border-subtle rounded-xl text-center text-text-muted">
               Loading market data...
             </div>
           )}
         </div>
 
         {/* Loan Input Section */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-6">
+        <div className="bg-surface border border-border-subtle rounded-xl p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-semibold tracking-tight text-zinc-50">Your Loans</h2>
+            <h2 className="text-2xl font-semibold tracking-tight text-text-primary">Your Loans</h2>
             <button
               onClick={addLoan}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors font-semibold text-sm active:scale-[0.98]"
+              className="px-4 py-2 bg-primary hover:bg-primary-hover rounded-lg transition-colors font-semibold text-sm active:scale-[0.98]"
             >
               + Add Loan
             </button>
@@ -252,22 +251,22 @@ export default function DebtOptimizerPage() {
 
           {loans.length === 0 ? (
             <div className="text-center py-12">
-              <div className="text-5xl mb-4">📝</div>
-              <p className="text-xl text-zinc-300 mb-2">No loans added yet</p>
-              <p className="text-sm text-zinc-500 mb-6">Click "Add Loan" above to get started</p>
+              <div className="flex justify-center mb-4"><FileText size={48} className="text-text-muted" /></div>
+              <p className="text-xl text-text-secondary mb-2">No loans added yet</p>
+              <p className="text-sm text-text-muted mb-6">Click "Add Loan" above to get started</p>
 
-              <div className="max-w-2xl mx-auto text-left bg-zinc-800/50 border border-zinc-800 rounded-xl p-6">
-                <h3 className="font-semibold text-lg mb-3 text-blue-400">Quick Tips:</h3>
-                <ul className="space-y-2 text-sm text-zinc-400">
+              <div className="max-w-2xl mx-auto text-left bg-surface-elevated/50 border border-border-subtle rounded-xl p-6">
+                <h3 className="font-semibold text-lg mb-3 text-primary">Quick Tips:</h3>
+                <ul className="space-y-2 text-sm text-text-secondary">
                   <li>Add all your debts: student loans, credit cards, car loans, etc.</li>
                   <li>You'll need: total balance, interest rate (APR), and monthly payment</li>
                   <li>Enter your monthly spare cash (money left after all bills/expenses)</li>
                   <li>We'll tell you which debt to tackle first vs investing in the market</li>
                 </ul>
 
-                <div className="mt-4 pt-4 border-t border-zinc-800">
-                  <p className="text-xs text-zinc-500">
-                    <strong className="text-zinc-400">Example:</strong> Credit card at 18% APR, Student loan at 6% APR -
+                <div className="mt-4 pt-4 border-t border-border-subtle">
+                  <p className="text-xs text-text-muted">
+                    <strong className="text-text-secondary">Example:</strong> Credit card at 18% APR, Student loan at 6% APR -
                     We'll recommend paying the credit card first (18% guaranteed return beats market's 10%)
                   </p>
                 </div>
@@ -276,14 +275,14 @@ export default function DebtOptimizerPage() {
           ) : (
             <div className="space-y-4">
               {loans.map((loan) => (
-                <div key={loan.id} className="bg-zinc-800/30 border border-zinc-800 rounded-xl p-4">
+                <div key={loan.id} className="bg-surface-elevated/30 border border-border-subtle rounded-xl p-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm text-zinc-500 mb-1">Loan Type</label>
+                      <label className="block text-sm text-text-muted mb-1">Loan Type</label>
                       <select
                         value={loan.loan_type}
                         onChange={(e) => updateLoan(loan.id, 'loan_type', e.target.value as LoanType)}
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                        className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                       >
                         <option value="student_loan">Student Loan</option>
                         <option value="car_loan">Car Loan</option>
@@ -294,46 +293,46 @@ export default function DebtOptimizerPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm text-zinc-500 mb-1">Loan Name</label>
+                      <label className="block text-sm text-text-muted mb-1">Loan Name</label>
                       <input
                         type="text"
                         value={loan.loan_name}
                         onChange={(e) => updateLoan(loan.id, 'loan_name', e.target.value)}
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                        className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                         placeholder="e.g., Chase Credit Card"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm text-zinc-500 mb-1">Amount Owed ($)</label>
+                      <label className="block text-sm text-text-muted mb-1">Amount Owed ($)</label>
                       <input
                         type="number"
                         value={loan.principal || ''}
                         onChange={(e) => updateLoan(loan.id, 'principal', parseFloat(e.target.value) || 0)}
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                        className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                         placeholder="25000"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm text-zinc-500 mb-1">Interest Rate (%)</label>
+                      <label className="block text-sm text-text-muted mb-1">Interest Rate (%)</label>
                       <input
                         type="number"
                         step="0.1"
                         value={loan.interest_rate || ''}
                         onChange={(e) => updateLoan(loan.id, 'interest_rate', parseFloat(e.target.value) || 0)}
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                        className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                         placeholder="7.5"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm text-zinc-500 mb-1">Monthly Payment ($)</label>
+                      <label className="block text-sm text-text-muted mb-1">Monthly Payment ($)</label>
                       <input
                         type="number"
                         value={loan.minimum_payment || ''}
                         onChange={(e) => updateLoan(loan.id, 'minimum_payment', parseFloat(e.target.value) || 0)}
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                        className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                         placeholder="200"
                       />
                     </div>
@@ -341,7 +340,7 @@ export default function DebtOptimizerPage() {
                     <div className="flex items-end">
                       <button
                         onClick={() => removeLoan(loan.id)}
-                        className="w-full px-4 py-2 bg-zinc-800 hover:bg-red-500/20 border border-zinc-700 hover:border-red-500/50 text-zinc-400 hover:text-red-400 rounded-lg transition-colors"
+                        className="w-full px-4 py-2 bg-surface-elevated hover:bg-destructive/20 border border-border hover:border-destructive/50 text-text-secondary hover:text-destructive rounded-lg transition-colors"
                       >
                         Remove
                       </button>
@@ -353,30 +352,30 @@ export default function DebtOptimizerPage() {
           )}
 
           {/* Budget Input */}
-          <div className="mt-6 pt-6 border-t border-zinc-800">
+          <div className="mt-6 pt-6 border-t border-border-subtle">
             <div>
-              <label className="block text-sm text-zinc-500 mb-1">Monthly Spare Cash ($)</label>
+              <label className="block text-sm text-text-muted mb-1">Monthly Spare Cash ($)</label>
               <input
                 type="number"
                 value={monthlyBudget}
                 onChange={(e) => setMonthlyBudget(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+                className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                 placeholder="100"
               />
-              <p className="text-xs text-zinc-600 mt-1">Extra money you have each month after paying all minimums and expenses</p>
+              <p className="text-xs text-text-muted/70 mt-1">Extra money you have each month after paying all minimums and expenses</p>
             </div>
           </div>
 
           <button
             onClick={handleOptimize}
             disabled={isLoading || loans.length === 0}
-            className="w-full mt-6 px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-lg font-semibold text-lg transition-colors active:scale-[0.98]"
+            className="w-full mt-6 px-6 py-3 btn-gradient disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none rounded-lg font-semibold text-lg"
           >
             {isLoading ? 'Optimizing...' : 'Optimize My Money'}
           </button>
 
           {error && (
-            <div className="mt-4 p-3 bg-zinc-900 border-l-4 border-red-500 rounded text-red-400 text-sm">
+            <div className="mt-4 p-3 bg-surface border-l-4 border-destructive rounded text-destructive text-sm">
               {error}
             </div>
           )}
@@ -386,29 +385,29 @@ export default function DebtOptimizerPage() {
         {result && (
           <div className="space-y-6">
             {/* Recommendation Card */}
-            <div className={`border-l-4 rounded-xl p-6 bg-zinc-900 border-t border-r border-b border-t-zinc-800 border-r-zinc-800 border-b-zinc-800 ${
+            <div className={`border-l-4 rounded-xl p-6 bg-surface border-t border-r border-b border-t-border-subtle border-r-border-subtle border-b-border-subtle ${
               result.overall_recommendation === 'pay_debts'
-                ? 'border-l-red-500'
-                : 'border-l-green-500'
+                ? 'border-l-destructive'
+                : 'border-l-success'
             }`}>
               <div className="text-center mb-4">
-                <div className="text-5xl mb-2">
-                  {result.overall_recommendation === 'pay_debts' ? '💳' : '📈'}
+                <div className="flex justify-center mb-2">
+                  {result.overall_recommendation === 'pay_debts' ? <CreditCard size={48} className="text-destructive" /> : <TrendingUp size={48} className="text-success" />}
                 </div>
-                <h2 className="text-3xl font-semibold tracking-tight text-zinc-50 mb-2">
+                <h2 className="text-3xl font-semibold tracking-tight text-text-primary mb-2">
                   {result.overall_recommendation === 'pay_debts' ? 'Pay Off Debt First' : 'Start Investing'}
                 </h2>
-                <div className="text-sm text-zinc-500">
+                <div className="text-sm text-text-muted">
                   Confidence: {(result.confidence_score * 100).toFixed(0)}%
                 </div>
               </div>
 
-              <div className="bg-zinc-800/50 rounded-lg p-4">
-                <h3 className="font-semibold text-zinc-200 mb-2">Why?</h3>
+              <div className="bg-surface-elevated/50 rounded-lg p-4">
+                <h3 className="font-semibold text-text-primary mb-2">Why?</h3>
                 <ul className="space-y-1 text-sm">
                   {result.reasoning.map((reason, idx) => (
-                    <li key={idx} className="text-zinc-400 flex items-start gap-2">
-                      <span className="text-blue-500 mt-0.5">+</span>
+                    <li key={idx} className="text-text-secondary flex items-start gap-2">
+                      <Check size={14} className="text-primary mt-0.5" />
                       {reason}
                     </li>
                   ))}
@@ -418,17 +417,17 @@ export default function DebtOptimizerPage() {
 
             {/* Debt Priority List - Only show if they have debts */}
             {result.debt_priorities.length > 0 && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                <h2 className="text-2xl font-semibold tracking-tight text-zinc-50 mb-4">Debt Payoff Priority</h2>
-                <p className="text-zinc-500 text-sm mb-4">Using the avalanche method (highest interest first)</p>
+              <div className="bg-surface border border-border-subtle rounded-xl p-6">
+                <h2 className="text-2xl font-semibold tracking-tight text-text-primary mb-4">Debt Payoff Priority</h2>
+                <p className="text-text-muted text-sm mb-4">Using the avalanche method (highest interest first)</p>
                 <div className="space-y-3">
                   {result.debt_priorities.map((debt) => (
                     <div
                       key={debt.priority}
                       className={`border rounded-xl p-4 ${
                         debt.priority === 1
-                          ? 'bg-zinc-800/50 border-amber-500/50'
-                          : 'bg-zinc-800/30 border-zinc-800'
+                          ? 'bg-surface-elevated/50 border-warning/50'
+                          : 'bg-surface-elevated/30 border-border-subtle'
                       }`}
                     >
                       <div className="flex justify-between items-start">
@@ -436,19 +435,19 @@ export default function DebtOptimizerPage() {
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`px-2 py-1 rounded text-xs font-semibold ${
                               debt.priority === 1
-                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                                ? 'bg-warning/20 text-warning border border-warning/30'
+                                : 'bg-surface-elevated text-text-secondary border border-border'
                             }`}>
                               #{debt.priority}
                             </span>
-                            <span className="font-semibold text-zinc-100">{debt.loan_name}</span>
-                            <span className="text-sm text-zinc-500">({getLoanTypeLabel(debt.loan_type as LoanType)})</span>
+                            <span className="font-semibold text-text-primary">{debt.loan_name}</span>
+                            <span className="text-sm text-text-muted">({getLoanTypeLabel(debt.loan_type as LoanType)})</span>
                           </div>
-                          <div className="text-sm text-zinc-400">{debt.reason}</div>
+                          <div className="text-sm text-text-secondary">{debt.reason}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-2xl font-semibold text-red-400">{debt.guaranteed_return.toFixed(1)}%</div>
-                          <div className="text-xs text-zinc-500">Interest Rate</div>
+                          <div className="text-2xl font-semibold text-destructive">{debt.guaranteed_return.toFixed(1)}%</div>
+                          <div className="text-xs text-text-muted">Interest Rate</div>
                         </div>
                       </div>
                     </div>
@@ -458,24 +457,24 @@ export default function DebtOptimizerPage() {
             )}
 
             {/* CTA to Personalized Plan */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
+            <div className="bg-surface border border-border-subtle rounded-xl p-8">
               <div className="text-center">
-                <div className="text-4xl mb-4">
-                  {result.overall_recommendation === 'invest' ? '🚀' : '📊'}
+                <div className="flex justify-center mb-4">
+                  {result.overall_recommendation === 'invest' ? <Rocket size={40} className="text-primary" /> : <BarChart3 size={40} className="text-primary" />}
                 </div>
-                <h3 className="text-2xl font-semibold tracking-tight text-zinc-50 mb-3">
+                <h3 className="text-2xl font-semibold tracking-tight text-text-primary mb-3">
                   {result.overall_recommendation === 'invest'
                     ? "Now Let's Build Your Investment Plan"
                     : "Plan Your Investment Strategy"}
                 </h3>
-                <p className="text-zinc-400 mb-6 max-w-lg mx-auto">
+                <p className="text-text-secondary mb-6 max-w-lg mx-auto">
                   {result.overall_recommendation === 'invest'
                     ? "Get a personalized portfolio with ETF allocations and see your projected wealth growth over 10, 20, and 30 years."
                     : "Once your high-interest debt is paid off, you'll want an investment plan ready. Set one up now based on your risk tolerance."}
                 </p>
                 <button
                   onClick={() => router.push('/tools/investment-plan')}
-                  className="px-8 py-4 bg-blue-500 hover:bg-blue-600 rounded-lg font-semibold text-lg transition-colors active:scale-[0.98]"
+                  className="px-8 py-4 btn-gradient rounded-lg font-semibold text-lg"
                 >
                   Create My Investment Plan
                 </button>
@@ -483,8 +482,8 @@ export default function DebtOptimizerPage() {
             </div>
 
             {/* Disclaimer */}
-            <div className="p-3 bg-zinc-900 border-l-4 border-amber-500 rounded text-sm text-zinc-400 text-center">
-              <strong className="text-amber-400">Note:</strong> This provides mathematical guidance, not financial advice. Consider your emergency fund and personal situation.
+            <div className="p-3 bg-surface border-l-4 border-warning rounded text-sm text-text-secondary text-center">
+              <strong className="text-warning">Note:</strong> This provides mathematical guidance, not financial advice. Consider your emergency fund and personal situation.
             </div>
           </div>
         )}

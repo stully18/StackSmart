@@ -17,13 +17,13 @@ export default function SettingsPage() {
   }, [user, isLoading, router])
 
   if (isLoading) {
-    return <div className="text-zinc-400">Loading...</div>
+    return <div className="text-text-muted">Loading...</div>
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-4 md:p-8">
+    <main className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-4xl font-semibold tracking-tight text-zinc-50 mb-8">Settings</h1>
+        <h1 className="text-4xl font-semibold tracking-tight text-text-primary mb-8">Settings</h1>
 
         <div className="space-y-6">
           <ProfileCard />

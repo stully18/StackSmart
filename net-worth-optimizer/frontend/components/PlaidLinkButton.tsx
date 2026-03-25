@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
+import { CreditCard, Loader2 } from 'lucide-react';
 
 interface PlaidLinkButtonProps {
   onSuccess: (balance: number) => void;
@@ -118,21 +119,16 @@ export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
       type="button"
       onClick={handleClick}
       disabled={isLoading}
-      className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 disabled:bg-zinc-800 disabled:text-zinc-500 text-zinc-200 text-sm font-medium rounded-lg transition-colors"
+      className="flex items-center gap-2 px-4 py-2 bg-surface-elevated hover:bg-surface-elevated/80 border border-border hover:border-primary/40 disabled:bg-surface-elevated disabled:text-text-muted text-text-primary text-sm font-medium rounded-lg transition-all"
     >
       {isLoading ? (
         <>
-          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
+          <Loader2 size={16} className="animate-spin" />
           Connecting...
         </>
       ) : (
         <>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-          </svg>
+          <CreditCard size={16} />
           Connect Bank
         </>
       )}

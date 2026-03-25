@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { Check } from 'lucide-react';
 
 interface ToolCardProps {
   href: string;
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   description: string;
   features: string[];
@@ -23,17 +24,19 @@ export default function ToolCard({
   return (
     <Link
       href={href}
-      className="group block bg-zinc-900 border border-zinc-800 rounded-xl p-6 hover:border-zinc-600 transition-all duration-200"
+      className="group block bg-surface border border-border-subtle rounded-xl p-6 hover:border-primary/40 transition-all duration-300 hover:shadow-[0_0_30px_rgba(37,99,235,0.08)]"
     >
-      <div className="text-3xl mb-4">{icon}</div>
-      <h3 className="text-lg font-semibold text-zinc-50 mb-2 group-hover:text-white transition-colors">
+      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4 text-primary">
+        {icon}
+      </div>
+      <h3 className="text-lg font-semibold text-text-primary mb-2 group-hover:text-white transition-colors">
         {title}
       </h3>
-      <p className="text-zinc-400 text-sm mb-4">{description}</p>
+      <p className="text-text-secondary text-sm mb-4">{description}</p>
       <ul className="space-y-1.5">
         {features.map((feature, idx) => (
-          <li key={idx} className="text-xs text-zinc-500 flex items-center gap-2">
-            <span className="text-blue-500">+</span>
+          <li key={idx} className="text-xs text-text-muted flex items-center gap-2">
+            <Check size={12} className="text-primary" />
             {feature}
           </li>
         ))}

@@ -57,19 +57,19 @@ export default function LoginForm() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl shadow-black/40 p-8">
+      <div className="bg-surface border border-border-subtle rounded-xl shadow-2xl shadow-black/60 p-8">
         {/* Logo/Title */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-semibold tracking-tight text-zinc-50 mb-2">
+          <h1 className="text-4xl font-semibold tracking-tight text-text-primary mb-2">
             StackSmart
           </h1>
-          <p className="text-zinc-500">Sign in to your account</p>
+          <p className="text-text-muted">Sign in to your account</p>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-zinc-900 border-l-4 border-red-500 rounded-lg">
-            <p className="text-red-400 text-sm font-medium">{error}</p>
+          <div className="mb-6 p-4 bg-surface border-l-4 border-destructive rounded-lg">
+            <p className="text-destructive text-sm font-medium">{error}</p>
           </div>
         )}
 
@@ -77,7 +77,7 @@ export default function LoginForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Email Input */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-zinc-400 mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-2">
               Email Address
             </label>
             <input
@@ -86,14 +86,14 @@ export default function LoginForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+              className="w-full px-4 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
               disabled={isLoading}
             />
           </div>
 
           {/* Password Input */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-zinc-400 mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-text-secondary mb-2">
               Password
             </label>
             <input
@@ -102,7 +102,7 @@ export default function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
-              className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+              className="w-full px-4 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
               disabled={isLoading}
             />
           </div>
@@ -111,7 +111,7 @@ export default function LoginForm() {
           <div className="flex justify-end">
             <Link
               href="/auth/forgot-password"
-              className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+              className="text-sm text-primary hover:text-primary-hover transition-colors"
             >
               Forgot password?
             </Link>
@@ -121,7 +121,7 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
+            className="w-full px-4 py-2 btn-gradient text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:bg-surface-elevated disabled:text-text-muted disabled:cursor-not-allowed disabled:bg-none transition-colors active:scale-[0.98]"
           >
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -129,11 +129,11 @@ export default function LoginForm() {
 
         {/* Sign Up Link */}
         <div className="mt-6 text-center">
-          <p className="text-zinc-500">
-            Don't have an account?{' '}
+          <p className="text-text-muted">
+            Don&apos;t have an account?{' '}
             <Link
               href="/auth/signup"
-              className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
+              className="text-primary hover:text-primary-hover font-semibold transition-colors"
             >
               Sign up
             </Link>

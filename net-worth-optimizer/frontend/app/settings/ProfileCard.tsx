@@ -47,14 +47,14 @@ export default function ProfileCard() {
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
-      <h2 className="text-2xl font-semibold tracking-tight text-zinc-50 mb-6">Profile</h2>
+    <div className="bg-surface border border-border-subtle rounded-xl p-8">
+      <h2 className="text-2xl font-semibold tracking-tight text-text-primary mb-6">Profile</h2>
 
       {message && (
         <div className={`mb-4 p-4 rounded-lg border-l-4 ${
           message.type === 'success'
-            ? 'bg-zinc-900 border-green-500 text-green-400'
-            : 'bg-zinc-900 border-red-500 text-red-400'
+            ? 'bg-surface border-success text-success'
+            : 'bg-surface border-destructive text-destructive'
         }`}>
           {message.text}
         </div>
@@ -63,28 +63,28 @@ export default function ProfileCard() {
       <div className="space-y-4">
         {/* Email (Read-only) */}
         <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-2">
+          <label className="block text-sm font-medium text-text-secondary mb-2">
             Email
           </label>
           <input
             type="email"
             value={user?.email || ''}
             disabled
-            className="w-full px-4 py-2 bg-zinc-800/50 border border-zinc-800 rounded-lg text-zinc-500 cursor-not-allowed"
+            className="w-full px-4 py-2 bg-surface-elevated/50 border border-border-subtle rounded-lg text-text-muted cursor-not-allowed"
           />
-          <p className="text-xs text-zinc-600 mt-1">Email cannot be changed</p>
+          <p className="text-xs text-text-muted/70 mt-1">Email cannot be changed</p>
         </div>
 
         {/* Full Name */}
         <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-2">
+          <label className="block text-sm font-medium text-text-secondary mb-2">
             Full Name
           </label>
           <input
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+            className="w-full px-4 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
             placeholder="John Doe"
             disabled={isLoading}
           />
@@ -94,7 +94,7 @@ export default function ProfileCard() {
         <button
           onClick={handleUpdateProfile}
           disabled={isLoading}
-          className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors disabled:bg-zinc-800 disabled:text-zinc-500 disabled:cursor-not-allowed mt-6 active:scale-[0.98]"
+          className="w-full py-2 btn-gradient text-white font-semibold rounded-lg transition-colors disabled:bg-surface-elevated disabled:text-text-muted disabled:cursor-not-allowed disabled:bg-none mt-6 active:scale-[0.98]"
         >
           {isLoading ? 'Updating...' : 'Update Profile'}
         </button>

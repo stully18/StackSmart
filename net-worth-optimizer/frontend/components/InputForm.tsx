@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { OptimizationRequest } from '@/types';
 import PlaidLinkButton from './PlaidLinkButton';
+import { Loader2 } from 'lucide-react';
 
 interface InputFormProps {
   onSubmit: (data: OptimizationRequest) => void;
@@ -46,15 +47,15 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-zinc-900 p-6 rounded-xl border border-zinc-800">
+    <form onSubmit={handleSubmit} className="bg-surface p-6 rounded-xl border border-border-subtle">
       <div className="text-center mb-4">
-        <h2 className="text-lg font-semibold text-zinc-50 mb-1">Your Financial Snapshot</h2>
-        <p className="text-zinc-500 text-xs">Enter your details to get personalized recommendations</p>
+        <h2 className="text-lg font-semibold text-text-primary mb-1">Your Financial Snapshot</h2>
+        <p className="text-text-muted text-xs">Enter your details to get personalized recommendations</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-zinc-400 mb-1">
+          <label className="block text-xs font-medium text-text-secondary mb-1">
             Loan Principal ($)
           </label>
           <input
@@ -62,14 +63,14 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
             step="0.01"
             value={formData.principal}
             onChange={(e) => setFormData({ ...formData, principal: e.target.value })}
-            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+            className="w-full px-3 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
             placeholder="25000"
             required
           />
         </div>
 
         <div className="md:col-span-1">
-          <label className="block text-xs font-medium text-zinc-400 mb-1">
+          <label className="block text-xs font-medium text-text-secondary mb-1">
             Interest (%)
           </label>
           <input
@@ -77,14 +78,14 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
             step="0.01"
             value={formData.interestRate}
             onChange={(e) => setFormData({ ...formData, interestRate: e.target.value })}
-            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+            className="w-full px-3 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
             placeholder="9.0"
             required
           />
         </div>
 
         <div className="md:col-span-1">
-          <label className="block text-xs font-medium text-zinc-400 mb-1">
+          <label className="block text-xs font-medium text-text-secondary mb-1">
             Min Payment/Mo ($)
           </label>
           <input
@@ -92,14 +93,14 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
             step="0.01"
             value={formData.minimumPayment}
             onChange={(e) => setFormData({ ...formData, minimumPayment: e.target.value })}
-            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+            className="w-full px-3 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
             placeholder="200"
             required
           />
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-zinc-400 mb-1">
+          <label className="block text-xs font-medium text-text-secondary mb-1">
             Spare Cash/Month ($)
           </label>
           <div className="flex gap-2">
@@ -108,7 +109,7 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
               step="0.01"
               value={formData.monthlyBudget}
               onChange={(e) => setFormData({ ...formData, monthlyBudget: e.target.value })}
-              className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+              className="flex-1 px-3 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
               placeholder="100"
               required
             />
@@ -117,14 +118,14 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
         </div>
 
         <div className="md:col-span-1">
-          <label className="block text-xs font-medium text-zinc-400 mb-1">
+          <label className="block text-xs font-medium text-text-secondary mb-1">
             Months Left
           </label>
           <input
             type="number"
             value={formData.monthsUntilGraduation}
             onChange={(e) => setFormData({ ...formData, monthsUntilGraduation: e.target.value })}
-            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-100 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all"
+            className="w-full px-3 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
             placeholder="48"
             required
           />
@@ -135,22 +136,19 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
         <button
           type="submit"
           disabled={isLoading}
-          className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg transition-colors active:scale-[0.98]"
+          className="flex-1 btn-gradient disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none disabled:cursor-not-allowed py-3 px-6 rounded-lg"
         >
           {isLoading ? (
             <span className="flex items-center justify-center">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <Loader2 size={20} className="animate-spin mr-3" />
               Calculating...
             </span>
           ) : (
             'Optimize My Money'
           )}
         </button>
-        <div className="px-4 py-3 bg-zinc-900 rounded-lg border border-zinc-800">
-          <p className="text-xs text-zinc-500 whitespace-nowrap">
+        <div className="px-4 py-3 bg-surface rounded-lg border border-border-subtle">
+          <p className="text-xs text-text-muted whitespace-nowrap">
             Market: 10% S&P 500 avg
           </p>
         </div>
