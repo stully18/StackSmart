@@ -24,7 +24,7 @@ export default function ToolCard({
   return (
     <Link
       href={href}
-      className="group block bg-surface border border-border-subtle rounded-xl p-6 hover:border-primary/40 transition-all duration-300 hover:shadow-[0_0_30px_rgba(37,99,235,0.08)]"
+      className="group block bg-surface border border-border-subtle rounded-xl p-6 hover:border-primary/40 hover:shadow-[0_0_30px_rgba(190,255,0,0.06)] hover:scale-[1.02] transition-transform duration-300"
     >
       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4 text-primary">
         {icon}

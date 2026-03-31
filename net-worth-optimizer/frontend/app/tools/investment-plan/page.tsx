@@ -401,7 +401,7 @@ export default function InvestmentPlanPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-6 py-3 btn-gradient rounded-lg font-semibold text-white disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none disabled:cursor-not-allowed"
+            className="w-full px-6 py-3 btn-gradient rounded-lg font-semibold text-gray-900 disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none disabled:cursor-not-allowed"
           >
             {loading ? 'Generating Plan...' : 'Generate My Investment Plan'}
           </button>

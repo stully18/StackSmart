@@ -94,7 +94,7 @@ export default function ProfileCard() {
         <button
           onClick={handleUpdateProfile}
           disabled={isLoading}
-          className="w-full py-2 btn-gradient text-white font-semibold rounded-lg transition-colors disabled:bg-surface-elevated disabled:text-text-muted disabled:cursor-not-allowed disabled:bg-none mt-6 active:scale-[0.98]"
+          className="w-full py-2 btn-gradient text-gray-900 font-semibold rounded-lg transition-colors disabled:bg-surface-elevated disabled:text-text-muted disabled:cursor-not-allowed disabled:bg-none mt-6 active:scale-[0.98]"
         >
           {isLoading ? 'Updating...' : 'Update Profile'}
         </button>

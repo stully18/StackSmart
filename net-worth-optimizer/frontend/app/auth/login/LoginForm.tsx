@@ -57,7 +57,7 @@ export default function LoginForm() {
 
   return (
     <div className="w-full max-w-md">
-      <div className="bg-surface border border-border-subtle rounded-xl shadow-2xl shadow-black/60 p-8">
+      <div className="glass-card rounded-xl shadow-2xl shadow-black/60 p-8">
         {/* Logo/Title */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-semibold tracking-tight text-text-primary mb-2">
@@ -121,7 +121,7 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full px-4 py-2 btn-gradient text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:bg-surface-elevated disabled:text-text-muted disabled:cursor-not-allowed disabled:bg-none transition-colors active:scale-[0.98]"
+            className="w-full px-4 py-2 btn-gradient text-gray-900 font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:bg-surface-elevated disabled:text-text-muted disabled:cursor-not-allowed disabled:bg-none transition-colors active:scale-[0.98]"
           >
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
