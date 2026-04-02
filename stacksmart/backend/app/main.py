@@ -11,8 +11,8 @@ from app.middleware.auth import verify_user_token
 from app.services.user_service import save_financial_plan, get_user_plans, delete_plan
 
 app = FastAPI(
-    title="Net Worth Optimizer API",
-    description="API for optimizing student financial decisions: debt repayment vs investing",
+    title="StackSmart API",
+    description="API for optimizing financial decisions: debt repayment vs investing",
     version="1.0.0"
 )
 
@@ -46,7 +46,7 @@ async def root():
     plaid_configured = bool(os.getenv('PLAID_CLIENT_ID')) and bool(os.getenv('PLAID_SECRET'))
 
     return {
-        "message": "Net Worth Optimizer API",
+        "message": "StackSmart API",
         "version": "1.0.0",
         "plaid_configured": plaid_configured,
         "endpoints": {

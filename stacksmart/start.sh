@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Master setup and run script for FratFinance
+# Master setup and run script for StackSmart
 # Installs dependencies if needed, then launches backend and frontend
+# Use --setup-only to install dependencies without launching servers
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -10,9 +11,15 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+SETUP_ONLY=false
+
+# Check for --setup-only flag
+if [ "$1" = "--setup-only" ]; then
+    SETUP_ONLY=true
+fi
 
 echo -e "${BLUE}═══════════════════════════════════════${NC}"
-echo -e "${BLUE}   FratFinance - Setup & Launch${NC}"
+echo -e "${BLUE}   StackSmart - Setup & Launch${NC}"
 echo -e "${BLUE}═══════════════════════════════════════${NC}"
 echo ""
 
@@ -29,25 +36,50 @@ fi
 
 # --- Backend setup ---
 echo -e "${GREEN}Setting up backend...${NC}"
-cd "$ROOT/backend"
+cd "$ROOT/backend" || { echo -e "${RED}Failed to enter backend directory${NC}"; exit 1; }
 
-if [ ! -d "venv" ]; then
+# Use explicit paths to venv python/pip
+VENV_PIP="$ROOT/backend/venv/bin/pip"
+VENV_PYTHON="$ROOT/backend/venv/bin/python"
+
+# Check if venv exists and is valid
+if [ ! -f "$VENV_PIP" ] || [ ! -f "$VENV_PYTHON" ]; then
+    if [ -d "venv" ]; then
+        echo "  Removing corrupted virtual environment..."
+        rm -rf venv
+    fi
     echo "  Creating virtual environment..."
-    python3 -m venv venv || { echo -e "${RED}Failed to create venv${NC}"; exit 1; }
+    python3 -m venv venv || { echo -e "${RED}Failed to create venv. Try: apt install python3-full${NC}"; exit 1; }
 fi
 
-source venv/bin/activate
+# Upgrade pip and setuptools (continue even if this fails)
+echo "  Upgrading pip and setuptools..."
+"$VENV_PIP" install --upgrade pip setuptools wheel --quiet 2>/dev/null || echo "  (pip upgrade skipped, will continue)"
 
 echo "  Installing Python dependencies..."
-pip install -r requirements.txt --quiet || { echo -e "${RED}pip install failed${NC}"; exit 1; }
+if [ ! -f "requirements.txt" ]; then
+    echo -e "${RED}Error: requirements.txt not found in backend directory${NC}"
+    exit 1
+fi
+"$VENV_PIP" install -r requirements.txt --quiet || { echo -e "${RED}pip install failed${NC}"; exit 1; }
 
 # --- Frontend setup ---
 echo -e "${GREEN}Setting up frontend...${NC}"
-cd "$ROOT/frontend"
+cd "$ROOT/frontend" || { echo -e "${RED}Failed to enter frontend directory${NC}"; exit 1; }
 
 if [ ! -d "node_modules" ] || [ ! -f "node_modules/.bin/next" ]; then
     echo "  Installing Node dependencies..."
     npm install || { echo -e "${RED}npm install failed${NC}"; exit 1; }
+else
+    echo "  Node dependencies already installed"
+fi
+
+# If --setup-only flag was passed, exit after setup
+if [ "$SETUP_ONLY" = true ]; then
+    echo ""
+    echo -e "${GREEN}✓ Setup complete! All dependencies installed.${NC}"
+    echo ""
+    exit 0
 fi
 
 # --- Cleanup handler ---
@@ -64,14 +96,17 @@ trap cleanup EXIT INT TERM
 # --- Launch backend ---
 echo ""
 echo -e "${GREEN}Starting backend on http://localhost:8000${NC}"
-cd "$ROOT/backend"
-source venv/bin/activate
-uvicorn app.main:app --reload &
+cd "$ROOT/backend" || { echo -e "${RED}Failed to enter backend directory${NC}"; exit 1; }
+"$VENV_PIP" install uvicorn --quiet || true  # Ensure uvicorn is installed
+"$VENV_PYTHON" -m uvicorn app.main:app --reload &
 BACKEND_PID=$!
+
+# Give backend a moment to start
+sleep 2
 
 # --- Launch frontend ---
 echo -e "${GREEN}Starting frontend on http://localhost:3000${NC}"
-cd "$ROOT/frontend"
+cd "$ROOT/frontend" || { echo -e "${RED}Failed to enter frontend directory${NC}"; exit 1; }
 npm run dev &
 FRONTEND_PID=$!
 
