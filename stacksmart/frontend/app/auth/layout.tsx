@@ -1,4 +1,10 @@
+import type { Metadata } from 'next'
 import { CheckCircle2 } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Sign In',
+  description: 'Sign in or create a free StackSmart account to access your financial tools.',
+}
 
 export default function AuthLayout({
   children

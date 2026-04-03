@@ -7,7 +7,7 @@ import { useAuth } from '@/app/context/AuthContext'
 
 export default function CTASection() {
   const ref = useRef<HTMLDivElement>(null)
-  const isInView = useInView(ref, { once: true, margin: '-80px' })
+  const isInView = useInView(ref, { once: true, margin: '0px', amount: 0 })
   const { user, isLoading } = useAuth()
 
   return (
@@ -30,7 +30,7 @@ export default function CTASection() {
           Start Building Your Financial Future
         </h2>
         <p className="text-text-secondary text-lg leading-[1.7] mb-8">
-          Join thousands of students making smarter financial decisions.
+          Four free tools. No spreadsheets. No financial jargon. Just clarity.
         </p>
         {!isLoading && (
           <Link

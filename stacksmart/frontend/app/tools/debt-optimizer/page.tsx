@@ -369,8 +369,11 @@ export default function DebtOptimizerPage() {
           <button
             onClick={handleOptimize}
             disabled={isLoading || loans.length === 0}
-            className="w-full mt-6 px-6 py-3 btn-gradient disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none rounded-lg font-semibold text-lg"
+            className="w-full mt-6 px-6 py-3 btn-gradient disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none rounded-lg font-semibold text-lg flex items-center justify-center gap-2"
           >
+            {isLoading && (
+              <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            )}
             {isLoading ? 'Optimizing...' : 'Optimize My Money'}
           </button>
 

@@ -4,6 +4,7 @@ import './globals.css'
 import { FinancialProvider } from './context/FinancialContext'
 import { AuthProvider } from './context/AuthContext'
 import Navigation from './components/Navigation'
+import { Analytics } from '@vercel/analytics/react'
 
 const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 const instrumentSerif = Instrument_Serif({
@@ -13,8 +14,25 @@ const instrumentSerif = Instrument_Serif({
 })
 
 export const metadata: Metadata = {
-  title: 'StackSmart',
-  description: 'Smart financial tools built for college students and new grads',
+  title: {
+    default: 'StackSmart — Build Wealth With Clarity',
+    template: '%s — StackSmart',
+  },
+  description:
+    'Free financial tools for college students and early-career professionals. Optimize debt, maximize your 401(k), plan a Roth IRA, and build an investment portfolio.',
+  openGraph: {
+    type: 'website',
+    siteName: 'StackSmart',
+    title: 'StackSmart — Build Wealth With Clarity',
+    description:
+      'Free financial tools for college students and early-career professionals. Optimize debt, maximize your 401(k), plan a Roth IRA, and build an investment portfolio.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'StackSmart — Build Wealth With Clarity',
+    description:
+      'Free financial tools for college students and early-career professionals.',
+  },
 }
 
 export default function RootLayout({
@@ -29,6 +47,7 @@ export default function RootLayout({
           <FinancialProvider>
             <Navigation />
             {children}
+            <Analytics />
           </FinancialProvider>
         </AuthProvider>
       </body>

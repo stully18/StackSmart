@@ -39,7 +39,7 @@ const features: Feature[] = [
 
 export default function FeaturesSection() {
   const sectionRef = useRef<HTMLDivElement>(null)
-  const isInView = useInView(sectionRef, { once: true, margin: '-100px' })
+  const isInView = useInView(sectionRef, { once: true, margin: '0px', amount: 0 })
 
   return (
     <section ref={sectionRef} className="py-16 md:py-20 px-6">

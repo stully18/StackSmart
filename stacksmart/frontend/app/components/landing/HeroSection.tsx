@@ -40,9 +40,6 @@ export default function HeroSection() {
               <Link href="/tools" className="btn-gradient px-8 py-4 text-lg">
                 Open Tools
               </Link>
-              <Link href="/investments" className="btn-ghost px-8 py-4 text-lg">
-                View Investments
-              </Link>
             </>
           ) : (
             <>
