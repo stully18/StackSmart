@@ -56,7 +56,7 @@ export default function Navigation() {
 
   const navItems = [
     { href: '/tools', label: 'Tools' },
-    { href: '/investments', label: 'Investments' },
+    // { href: '/investments', label: 'Investments' }, // hidden until Plaid integration is complete
   ]
 
   const userInitial = user?.email?.charAt(0).toUpperCase() || '?'
