@@ -46,7 +46,7 @@ export default function InvestmentDashboard({ accessToken }: InvestmentDashboard
     const fetchInvestmentData = async () => {
       try {
         setIsLoading(true);
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL!;
         const response = await fetch(`${API_BASE_URL}/api/investments/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

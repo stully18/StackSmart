@@ -16,7 +16,7 @@ export default function PlaidInvestmentButton({ onSuccess }: PlaidInvestmentButt
   const fetchLinkToken = async () => {
     setIsLoading(true);
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL!;
       const response = await fetch(`${API_BASE_URL}/api/plaid/create-link-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

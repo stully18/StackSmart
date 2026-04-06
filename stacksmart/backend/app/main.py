@@ -35,8 +35,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
@@ -83,7 +83,8 @@ async def optimize_financial_path(request: OptimizationRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        print(f"[ERROR] Optimization failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.post("/api/optimize-multi-loan", response_model=MultiLoanOptimizationResult)
@@ -102,7 +103,7 @@ async def optimize_multi_loan(request: MultiLoanOptimizationRequest):
     - Clear reasoning for recommendations
     """
     try:
-        print(f"[DEBUG] Multi-loan optimization: {len(request.loans)} loans, ${request.monthly_budget}/month budget")
+        print(f"[DEBUG] Multi-loan optimization: {len(request.loans)} loans")
 
         result = multi_loan_optimizer.calculate_multi_loan_optimization(
             loans=request.loans,
@@ -120,7 +121,7 @@ async def optimize_multi_loan(request: MultiLoanOptimizationRequest):
         print(f"[ERROR] Optimization failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 # ============= Plaid Integration Endpoints =============
@@ -153,7 +154,7 @@ async def create_link_token(request: CreateLinkTokenRequest):
         print(f"[ERROR] Plaid link token creation failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.post("/api/plaid/exchange-token")
@@ -166,7 +167,8 @@ async def exchange_public_token(request: ExchangeTokenRequest):
         result = plaid_service.exchange_public_token(request.public_token)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] Token exchange failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.post("/api/plaid/balance")
@@ -178,15 +180,13 @@ async def get_account_balance(request: GetBalanceRequest):
     try:
         # Note: In production, you'd pass the access_token from a stored user record
         # For now, we accept it in the request (NOT secure for production)
-        print(f"[DEBUG] Fetching balance for access_token: {request.access_token[:20]}...")
         result = plaid_service.get_account_balance(request.access_token)
-        print(f"[DEBUG] Balance fetched successfully: ${result['total_balance']}")
         return result
     except Exception as e:
         print(f"[ERROR] Balance fetch failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.post("/api/plaid/transactions")
@@ -212,7 +212,8 @@ async def get_transactions(request: GetTransactionsRequest):
             'analysis': analysis
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] Transaction fetch failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 # ============= Investment Analysis Endpoints =============
@@ -231,13 +232,13 @@ async def get_investment_holdings(request: GetBalanceRequest):
     try:
         print(f"[DEBUG] Fetching investment holdings...")
         result = plaid_service.get_investment_holdings(request.access_token)
-        print(f"[DEBUG] Found {result['holdings_count']} holdings worth ${result['total_value']}")
+        print(f"[DEBUG] Found {result['holdings_count']} holdings")
         return result
     except Exception as e:
         print(f"[ERROR] Investment holdings fetch failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.post("/api/investments/transactions")
@@ -261,7 +262,7 @@ async def get_investment_transactions(request: GetInvestmentDataRequest):
         print(f"[ERROR] Investment transactions fetch failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.post("/api/investments/analyze")
@@ -306,13 +307,13 @@ async def analyze_investments(request: GetInvestmentDataRequest):
             'analysis': analysis
         }
 
-        print(f"[DEBUG] Analysis complete - Health Score: {analysis['health_score']}/100")
+        print("[INFO] Investment analysis complete")
         return result
     except Exception as e:
         print(f"[ERROR] Investment analysis failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 # ============= Investment Planning Endpoints =============
@@ -342,7 +343,7 @@ async def create_investment_plan(request: CreateInvestmentPlanRequest):
         if request.total_portfolio_value < 0:
             raise HTTPException(status_code=400, detail="Portfolio value must be positive")
 
-        print(f"[DEBUG] Creating investment plan for ${request.total_portfolio_value} with risk tolerance {request.risk_tolerance}")
+        print(f"[DEBUG] Creating investment plan with risk tolerance {request.risk_tolerance}")
 
         plan = investment_planner.generate_investment_plan(
             request.total_portfolio_value,
@@ -358,7 +359,7 @@ async def create_investment_plan(request: CreateInvestmentPlanRequest):
         print(f"[ERROR] Investment plan creation failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 # ============= Unified Dashboard Endpoint =============
@@ -380,13 +381,13 @@ async def get_complete_financial_picture(request: GetBalanceRequest):
     try:
         print(f"[DEBUG] Fetching complete financial picture...")
         result = plaid_service.get_complete_financial_picture(request.access_token)
-        print(f"[DEBUG] Complete! Net Worth: ${result['net_worth']:.2f}, Assets: ${result['total_assets']:.2f}, Liabilities: ${result['total_liabilities']:.2f}")
+        print("[INFO] Complete financial picture fetched")
         return result
     except Exception as e:
         print(f"[ERROR] Complete picture fetch failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 # ============= Action Plan Engine =============
@@ -428,7 +429,7 @@ async def generate_action_plan(request: GenerateActionPlanRequest):
         print(f"[ERROR] Action plan generation failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 # ============= Market Data Endpoints =============
@@ -453,7 +454,8 @@ async def get_stock_quote(request: GetMarketDataRequest):
         quote = market_data_service.get_stock_quote(request.ticker.upper())
         return quote
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] Stock quote fetch failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.post("/api/market/etf-details")
@@ -466,11 +468,11 @@ async def get_etf_details(request: GetMarketDataRequest):
     try:
         print(f"[DEBUG] Fetching market data for {request.ticker}...")
         details = market_data_service.get_etf_details(request.ticker.upper())
-        print(f"[DEBUG] Got price ${details['price']}, 1yr return: {details['returns']['1yr_return']}%")
+        print("[INFO] ETF details fetched")
         return details
     except Exception as e:
         print(f"[ERROR] Market data fetch failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.post("/api/market/batch-etf-data")
@@ -489,7 +491,7 @@ async def get_multiple_etf_data(request: GetMultipleMarketDataRequest):
         return data
     except Exception as e:
         print(f"[ERROR] Batch market data fetch failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.get("/api/market/voo-live")
@@ -511,13 +513,13 @@ async def get_voo_live_data():
     try:
         print("[DEBUG] Fetching live VOO market data...")
         data = market_data_fetcher.get_voo_live_data()
-        print(f"[DEBUG] VOO: ${data['price']} ({data['change_percent_today']:+.2f}% today) - Source: {data['data_source']}")
+        print("[INFO] VOO live data fetched")
         return data
     except Exception as e:
         print(f"[ERROR] VOO live data fetch failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.get("/api/market/sp500-performance")
@@ -533,13 +535,13 @@ async def get_sp500_performance():
     try:
         print("[DEBUG] Fetching S&P 500 performance data...")
         data = market_data_fetcher.get_sp500_performance()
-        print(f"[DEBUG] S&P 500: 1yr return {data.get('one_year_return', 'N/A')}%")
+        print("[INFO] S&P 500 performance data fetched")
         return data
     except Exception as e:
         print(f"[ERROR] S&P 500 performance fetch failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 @app.get("/api/market/etf/{ticker}")
@@ -556,13 +558,13 @@ async def get_etf_data(ticker: str):
     try:
         print(f"[DEBUG] Fetching market data for {ticker}...")
         data = market_data_fetcher.get_etf_details(ticker.upper())
-        print(f"[DEBUG] {ticker}: ${data['price']} (1yr: {data.get('one_year_return', 'N/A')}%)")
+        print(f"[INFO] ETF data fetched for {ticker}")
         return data
     except Exception as e:
         print(f"[ERROR] ETF data fetch failed for {ticker}: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 # ============= Personalized Financial Plan Endpoints =============
@@ -593,7 +595,7 @@ async def generate_financial_plan(request: PersonalizedPlanRequest):
     Uses REAL market data for ETF prices and performance.
     """
     try:
-        print(f"[DEBUG] Generating personalized plan: ${request.monthly_investment_amount}/mo, {request.risk_tolerance.value} risk, {request.financial_goal.value} goal")
+        print(f"[DEBUG] Generating personalized plan: {request.risk_tolerance.value} risk, {request.financial_goal.value} goal")
 
         plan = personalized_planner.generate_personalized_plan(request)
 
@@ -603,7 +605,7 @@ async def generate_financial_plan(request: PersonalizedPlanRequest):
         print(f"[ERROR] Plan generation failed: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
 
 
 # ============= User-Scoped Data Endpoints =============

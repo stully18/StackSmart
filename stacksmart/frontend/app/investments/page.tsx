@@ -23,7 +23,7 @@ export default function InvestmentsPage() {
   const handleInvestmentConnection = async (publicToken: string) => {
     try {
       // Exchange public token for access token
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL!;
       const response = await fetch(`${API_BASE_URL}/api/plaid/exchange-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

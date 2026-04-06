@@ -93,7 +93,7 @@ export default function InvestmentPlanPage() {
     setError(null);
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL!;
       const payload = {
         ...formData,
         time_horizon_years: 10,

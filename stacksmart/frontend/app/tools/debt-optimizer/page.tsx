@@ -105,7 +105,7 @@ export default function DebtOptimizerPage() {
         market_assumptions: marketAssumptions
       };
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL!;
       const response = await fetch(`${API_BASE_URL}/api/optimize-multi-loan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -142,7 +142,7 @@ export default function DebtOptimizerPage() {
     const fetchMarketData = async () => {
       setMarketDataLoading(true);
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL!;
         const response = await fetch(`${API_BASE_URL}/api/market/voo-live`);
         if (response.ok) {
           const data = await response.json();
