@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import PlaidInvestmentButton from '@/components/PlaidInvestmentButton';
 import InvestmentDashboard from '@/components/InvestmentDashboard';
+import { ErrorAlert } from '../components/Alerts';
 import { ArrowLeft, BarChart3, Check } from 'lucide-react';
 
 export default function InvestmentsPage() {
@@ -12,6 +13,7 @@ export default function InvestmentsPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Redirect to login only AFTER auth finishes loading and there's truly no user
   useEffect(() => {
@@ -35,7 +37,7 @@ export default function InvestmentsPage() {
       setIsConnected(true);
     } catch (error) {
       console.error('Error connecting investment account:', error);
-      alert('Failed to connect investment account. Please try again.');
+      setError('Failed to connect investment account. Please try again.');
     }
   };
 
@@ -52,8 +54,10 @@ export default function InvestmentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-white p-8">
-      <div className="max-w-7xl mx-auto">
+    <>
+      {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
+      <div className="min-h-screen bg-background text-white p-8">
+        <div className="max-w-7xl mx-auto">
         {/* Back Button */}
         <div className="mb-6">
           <a
@@ -99,7 +103,8 @@ export default function InvestmentsPage() {
         ) : (
           <InvestmentDashboard accessToken={accessToken!} />
         )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

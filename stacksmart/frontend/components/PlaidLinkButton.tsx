@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 import { CreditCard, Loader2 } from 'lucide-react';
+import { ErrorAlert } from '@/app/components/Alerts';
 
 interface PlaidLinkButtonProps {
   onSuccess: (balance: number) => void;
@@ -16,6 +17,7 @@ if (!API_BASE_URL) {
 export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch link token from backend
   const fetchLinkToken = async () => {
@@ -30,7 +32,7 @@ export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
       setLinkToken(data.link_token);
     } catch (error) {
       console.error('Error fetching link token:', error);
-      alert('Failed to connect to Plaid. Please try again.');
+      setError('Failed to connect to Plaid. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +92,7 @@ export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
       onSuccess(suggestedSpare);
     } catch (error) {
       console.error('Error processing bank connection:', error);
-      alert('Connected successfully, but couldn\'t fetch balance. Please enter manually.');
+      setError('Connected successfully, but couldn\'t fetch balance. Please enter manually.');
     }
   }, [onSuccess]);
 
@@ -118,23 +120,26 @@ export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={isLoading}
-      className="flex items-center gap-2 px-4 py-2 bg-surface-elevated hover:bg-surface-elevated/80 border border-border hover:border-primary/40 disabled:bg-surface-elevated disabled:text-text-muted text-text-primary text-sm font-medium rounded-lg transition-all"
-    >
-      {isLoading ? (
-        <>
-          <Loader2 size={16} className="animate-spin" />
-          Connecting...
-        </>
-      ) : (
-        <>
-          <CreditCard size={16} />
-          Connect Bank
-        </>
-      )}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={isLoading}
+        className="flex items-center gap-2 px-4 py-2 bg-surface-elevated hover:bg-surface-elevated/80 border border-border hover:border-primary/40 disabled:bg-surface-elevated disabled:text-text-muted text-text-primary text-sm font-medium rounded-lg transition-all"
+      >
+        {isLoading ? (
+          <>
+            <Loader2 size={16} className="animate-spin" />
+            Connecting...
+          </>
+        ) : (
+          <>
+            <CreditCard size={16} />
+            Connect Bank
+          </>
+        )}
+      </button>
+      {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
+    </>
   );
 }

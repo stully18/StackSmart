@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 import { BarChart3, Loader2 } from 'lucide-react';
+import { ErrorAlert } from '@/app/components/Alerts';
 
 interface PlaidInvestmentButtonProps {
   onSuccess: (publicToken: string) => void;
@@ -11,6 +12,7 @@ interface PlaidInvestmentButtonProps {
 export default function PlaidInvestmentButton({ onSuccess }: PlaidInvestmentButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch link token from backend
   const fetchLinkToken = async () => {
@@ -29,7 +31,7 @@ export default function PlaidInvestmentButton({ onSuccess }: PlaidInvestmentButt
       setLinkToken(data.link_token);
     } catch (error) {
       console.error('Error fetching link token:', error);
-      alert('Failed to connect to Plaid. Please try again.');
+      setError('Failed to connect to Plaid. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -65,23 +67,26 @@ export default function PlaidInvestmentButton({ onSuccess }: PlaidInvestmentButt
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={isLoading}
-      className="flex items-center gap-2 px-6 py-3 btn-gradient disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none font-medium rounded-lg active:scale-[0.98]"
-    >
-      {isLoading ? (
-        <>
-          <Loader2 size={20} className="animate-spin" />
-          Connecting...
-        </>
-      ) : (
-        <>
-          <BarChart3 size={20} />
-          Connect Investment Account
-        </>
-      )}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={isLoading}
+        className="flex items-center gap-2 px-6 py-3 btn-gradient disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none font-medium rounded-lg active:scale-[0.98]"
+      >
+        {isLoading ? (
+          <>
+            <Loader2 size={20} className="animate-spin" />
+            Connecting...
+          </>
+        ) : (
+          <>
+            <BarChart3 size={20} />
+            Connect Investment Account
+          </>
+        )}
+      </button>
+      {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
+    </>
   );
 }
