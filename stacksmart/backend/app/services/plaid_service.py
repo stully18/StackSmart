@@ -67,7 +67,7 @@ def create_link_token(user_id: str, account_type: str = "all") -> Dict:
 
         request = LinkTokenCreateRequest(
             products=products,
-            client_name="College Wealth Builder",
+            client_name="StackSmart",
             country_codes=[CountryCode('US')],
             language='en',
             user=LinkTokenCreateRequestUser(

@@ -171,7 +171,7 @@ export default function DebtOptimizerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-white p-8">
+    <div className="min-h-screen bg-background text-white px-4 py-6 sm:px-6 sm:py-8">
       <div className="max-w-6xl mx-auto">
         {/* Back to Tools */}
         <div className="mb-6">
@@ -186,7 +186,7 @@ export default function DebtOptimizerPage() {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-semibold tracking-tight text-text-primary mb-2">
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-text-primary mb-2">
             Debt Optimizer
           </h1>
           <p className="text-text-muted">Add your loans and see which debts to pay first vs investing</p>
@@ -460,7 +460,7 @@ export default function DebtOptimizerPage() {
             )}
 
             {/* CTA to Personalized Plan */}
-            <div className="bg-surface border border-border-subtle rounded-xl p-8">
+            <div className="bg-surface border border-border-subtle rounded-xl p-6 sm:p-8">
               <div className="text-center">
                 <div className="flex justify-center mb-4">
                   {result.overall_recommendation === 'invest' ? <Rocket size={40} className="text-primary" /> : <BarChart3 size={40} className="text-primary" />}

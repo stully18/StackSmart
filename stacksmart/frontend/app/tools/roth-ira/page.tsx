@@ -58,7 +58,7 @@ export default function RothIRAPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-white p-8">
+    <div className="min-h-screen bg-background text-white px-4 py-6 sm:px-6 sm:py-8">
       <div className="max-w-6xl mx-auto">
         {/* Back to Tools */}
         <div className="mb-6">
@@ -71,7 +71,7 @@ export default function RothIRAPage() {
           </Link>
         </div>
 
-        <h1 className="text-4xl font-semibold tracking-tight text-text-primary mb-2">Why Roth IRA is a Superpower for College Students</h1>
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-text-primary mb-2">Why Roth IRA is a Superpower for College Students</h1>
         <p className="text-text-muted mb-8">
           The earlier you start, the more powerful it becomes. Let the math convince you.
         </p>

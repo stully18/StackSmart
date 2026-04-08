@@ -80,11 +80,11 @@ export default function ToolsPage() {
   ];
 
   return (
-    <AuroraBackground className="min-h-screen bg-background text-white p-8">
+    <AuroraBackground className="min-h-screen bg-background text-white px-4 py-6 sm:px-6 sm:py-8">
       <div className="max-w-6xl mx-auto relative">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-semibold tracking-tight text-text-primary mb-4">
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-text-primary mb-4">
             Financial Tools
           </h1>
           <p className="text-text-muted max-w-2xl mx-auto">

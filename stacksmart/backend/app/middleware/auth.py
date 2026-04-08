@@ -4,7 +4,7 @@ import os
 
 def get_supabase_client() -> Client:
     url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_KEY")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     return create_client(url, key)
 
 async def verify_user_token(request: Request) -> str:

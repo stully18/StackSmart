@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export default function ChangePasswordForm() {
-  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -35,7 +34,6 @@ export default function ChangePasswordForm() {
       if (error) throw error
 
       setMessage({ type: 'success', text: 'Password changed successfully' })
-      setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
     } catch (error) {

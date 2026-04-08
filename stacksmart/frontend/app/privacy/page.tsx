@@ -78,8 +78,12 @@ export default function PrivacyPage() {
           <section>
             <h2 className="font-semibold text-xl text-text-primary mb-3">6. Contact</h2>
             <p>
-              If you have questions about this privacy policy, please reach out via the contact information
-              on our website.
+              If you have questions about this privacy policy or want to request deletion of your data,
+              please email us at{' '}
+              <a href="mailto:hello@stacksmart.io" className="text-primary hover:text-primary-hover transition-colors">
+                hello@stacksmart.io
+              </a>
+              .
             </p>
           </section>
 

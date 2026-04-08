@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (isMounted) {
-          console.log('[AuthContext] Auth state changed:', event, session?.user?.email)
+          if (process.env.NODE_ENV === 'development') console.log('[AuthContext] Auth state changed:', event)
           setSession(session)
           setUser(session?.user ?? null)
           if (!loadingDone) {
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (isMounted) {
-          console.log('[AuthContext] Initial session check:', session?.user?.email)
+          if (process.env.NODE_ENV === 'development') console.log('[AuthContext] Initial session check done')
           setSession(session)
           setUser(session?.user ?? null)
           if (!loadingDone) {
@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
+    localStorage.removeItem('financialData')
     setUser(null)
     setSession(null)
   }

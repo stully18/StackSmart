@@ -4,7 +4,7 @@ from uuid import UUID
 
 def get_supabase_client() -> Client:
     url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_KEY")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     return create_client(url, key)
 
 async def save_financial_plan(user_id: str, plan_name: str, plan_type: str, data: dict):

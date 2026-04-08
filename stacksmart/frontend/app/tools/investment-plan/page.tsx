@@ -154,7 +154,7 @@ export default function InvestmentPlanPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-white p-8">
+    <div className="min-h-screen bg-background text-white px-4 py-6 sm:px-6 sm:py-8">
       <div className="max-w-6xl mx-auto">
         {/* Back to Tools */}
         <div className="mb-6">
@@ -167,7 +167,7 @@ export default function InvestmentPlanPage() {
           </Link>
         </div>
 
-        <h1 className="text-4xl font-semibold tracking-tight text-text-primary mb-2">
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-text-primary mb-2">
           Personalized Investment Plan
         </h1>
         <p className="text-text-muted mb-8">
@@ -386,7 +386,7 @@ export default function InvestmentPlanPage() {
             {/* Projections */}
             <div className="bg-surface border border-border-subtle rounded-xl p-6">
               <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">Projected Portfolio Value</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="bg-surface-elevated/30 border border-border-subtle rounded-xl p-4">
                   <div className="text-sm text-text-muted mb-1">1 Year</div>
                   <div className="text-2xl font-semibold text-text-primary">

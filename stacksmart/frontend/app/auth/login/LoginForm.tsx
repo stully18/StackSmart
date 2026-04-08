@@ -19,7 +19,7 @@ export default function LoginForm() {
   // Redirect to tools once auth state is updated after login
   useEffect(() => {
     if (shouldRedirect && user) {
-      console.log('[LoginForm] Auth state updated with user, redirecting to /tools')
+      if (process.env.NODE_ENV === 'development') console.log('[LoginForm] Auth state updated, redirecting')
       router.push('/tools')
     }
   }, [shouldRedirect, user, router])
@@ -47,7 +47,7 @@ export default function LoginForm() {
       if (result.user && result.session) {
         // Login successful - wait for AuthContext listener to update user state
         // before redirecting to tools
-        console.log('[LoginForm] Sign in successful, waiting for auth state update')
+        if (process.env.NODE_ENV === 'development') console.log('[LoginForm] Sign in successful, waiting for auth state update')
         setShouldRedirect(true)
       }
     } catch (err) {

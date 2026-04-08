@@ -15,12 +15,10 @@ export default function InvestmentsPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect to login only AFTER auth finishes loading and there's truly no user
+  // Investments feature is not yet live — redirect to tools
   useEffect(() => {
-    if (authLoading === false && user === null) {
-      router.push('/auth/login');
-    }
-  }, [user, authLoading, router]);
+    router.replace('/tools');
+  }, [router]);
 
   const handleInvestmentConnection = async (publicToken: string) => {
     try {

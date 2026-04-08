@@ -5,6 +5,11 @@ import { FinancialProvider } from './context/FinancialContext'
 import { AuthProvider } from './context/AuthContext'
 import Navigation from './components/Navigation'
 import { Analytics } from '@vercel/analytics/react'
+import dynamic from 'next/dynamic'
+
+const CookieBanner = dynamic(() => import('./components/CookieBanner'), {
+  ssr: false,
+})
 
 const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 const instrumentSerif = Instrument_Serif({
@@ -48,6 +53,7 @@ export default function RootLayout({
             <Navigation />
             {children}
             <Analytics />
+            <CookieBanner />
           </FinancialProvider>
         </AuthProvider>
       </body>
