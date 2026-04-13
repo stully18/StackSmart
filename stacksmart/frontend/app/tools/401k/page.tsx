@@ -12,6 +12,7 @@ export default function Calculator401kPage() {
 
   // Input states
   const [salary, setSalary] = useState(60000);
+  const [salaryIncrease, setSalaryIncrease] = useState(3);
   const [contributionPercent, setContributionPercent] = useState(6);
   const [employerMatchPercent, setEmployerMatchPercent] = useState(50);
   const [employerMatchCap, setEmployerMatchCap] = useState(6);
@@ -27,33 +28,39 @@ export default function Calculator401kPage() {
 
   // Calculate 401(k) growth
   const calculateGrowth = () => {
-    // Annual employee contribution
-    const annualContribution = salary * (contributionPercent / 100);
-
-    // Employer contribution = salary * min(contribution%, cap%) * match%
-    const effectiveEmployerContributionPercent = Math.min(contributionPercent, employerMatchCap);
-    const annualEmployerMatch = salary * (effectiveEmployerContributionPercent / 100) * (employerMatchPercent / 100);
-
-    // Total annual contribution
-    const totalAnnualContribution = annualContribution + annualEmployerMatch;
-
-    // Future value calculation using compound interest with annual contributions
+    const IRS_LIMIT = 23500;
     const rate = expectedReturn / 100;
-    const years = yearsToRetirement;
+    const growthRate = salaryIncrease / 100;
 
-    // Future value of annuity formula: PMT * (((1 + r)^n - 1) / r)
-    const futureValue = totalAnnualContribution * (((Math.pow(1 + rate, years) - 1) / rate));
+    let balance = 0;
+    let totalEmployeeContributions = 0;
+    let totalEmployerContributions = 0;
+    let currentSalary = salary;
 
-    // Calculate totals
-    const totalEmployeeContributions = annualContribution * years;
-    const totalEmployerContributions = annualEmployerMatch * years;
+    for (let year = 0; year < yearsToRetirement; year++) {
+      const rawEmployee = currentSalary * (contributionPercent / 100);
+      const employeeContrib = Math.min(rawEmployee, IRS_LIMIT);
+      const effectivePct = Math.min(contributionPercent, employerMatchCap);
+      const employerContrib = currentSalary * (effectivePct / 100) * (employerMatchPercent / 100);
+
+      balance = (balance + employeeContrib + employerContrib) * (1 + rate);
+      totalEmployeeContributions += employeeContrib;
+      totalEmployerContributions += employerContrib;
+      currentSalary *= (1 + growthRate);
+    }
+
+    // First-year values for the breakdown display
+    const firstYearEmployee = Math.min(salary * (contributionPercent / 100), IRS_LIMIT);
+    const firstYearEmployer = salary * (Math.min(contributionPercent, employerMatchCap) / 100) * (employerMatchPercent / 100);
+
+    const futureValue = balance;
     const totalContributions = totalEmployeeContributions + totalEmployerContributions;
     const investmentGains = futureValue - totalContributions;
 
     return {
-      annualContribution: Math.round(annualContribution),
-      annualEmployerMatch: Math.round(annualEmployerMatch),
-      totalAnnualContribution: Math.round(totalAnnualContribution),
+      annualContribution: Math.round(firstYearEmployee),
+      annualEmployerMatch: Math.round(firstYearEmployer),
+      totalAnnualContribution: Math.round(firstYearEmployee + firstYearEmployer),
       futureValue: Math.round(futureValue),
       totalEmployeeContributions: Math.round(totalEmployeeContributions),
       totalEmployerContributions: Math.round(totalEmployerContributions),
@@ -138,6 +145,27 @@ export default function Calculator401kPage() {
               <div className="flex justify-between text-xs text-text-muted/70 mt-1">
                 <span>$30k</span>
                 <span>$200k</span>
+              </div>
+            </div>
+
+            {/* Annual Salary Increase */}
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Annual Salary Increase: {salaryIncrease}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="8"
+                step="0.5"
+                value={salaryIncrease}
+                onChange={(e) => setSalaryIncrease(parseFloat(e.target.value))}
+                className="w-full h-2 bg-surface-elevated rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="flex justify-between text-xs text-text-muted/70 mt-1">
+                <span>0%</span>
+                <span>3% (typical)</span>
+                <span>8%</span>
               </div>
             </div>
 
