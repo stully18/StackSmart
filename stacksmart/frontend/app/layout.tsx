@@ -24,19 +24,19 @@ export const metadata: Metadata = {
     template: '%s — StackSmart',
   },
   description:
-    'Free financial tools for college students and early-career professionals. Optimize debt, maximize your 401(k), plan a Roth IRA, and build an investment portfolio.',
+    'Free financial planning tools for early-career professionals. Optimize debt, maximize your 401(k), plan a Roth IRA, and build an investment portfolio.',
   openGraph: {
     type: 'website',
     siteName: 'StackSmart',
     title: 'StackSmart — Build Wealth With Clarity',
     description:
-      'Free financial tools for college students and early-career professionals. Optimize debt, maximize your 401(k), plan a Roth IRA, and build an investment portfolio.',
+      'Free financial planning tools for early-career professionals. Optimize debt, maximize your 401(k), plan a Roth IRA, and build an investment portfolio.',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'StackSmart — Build Wealth With Clarity',
     description:
-      'Free financial tools for college students and early-career professionals.',
+      'Free financial planning tools for early-career professionals.',
   },
 }
 

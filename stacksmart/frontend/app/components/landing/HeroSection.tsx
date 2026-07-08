@@ -25,8 +25,8 @@ export default function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
         >
-          Professional tools for students and early-career professionals to optimize debt,
-          maximize retirement contributions, and invest with confidence.
+          Planning tools for early-career professionals who need a clearer answer on debt,
+          retirement contributions, and long-term investing.
         </motion.p>
 
         <motion.div

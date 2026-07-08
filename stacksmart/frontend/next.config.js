@@ -13,11 +13,11 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://va.vercel-scripts.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: https: blob:",
-              "connect-src 'self' https://*.supabase.co https://fratfinance-production.up.railway.app http://localhost:8000 http://127.0.0.1:8000",
+              "connect-src 'self' https://*.supabase.co https://fratfinance-production.up.railway.app https://vitals.vercel-insights.com http://localhost:8000 http://127.0.0.1:8000",
               "frame-ancestors 'none'",
             ].join('; '),
           },

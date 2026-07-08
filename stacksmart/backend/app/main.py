@@ -60,7 +60,17 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "net-worth-optimizer"}
+    return {
+        "status": "healthy",
+        "service": "stacksmart-api",
+        "version": "1.0.0",
+        "environment": os.getenv("RAILWAY_ENVIRONMENT_NAME", os.getenv("ENVIRONMENT", "local")),
+        "dependencies": {
+            "supabase_configured": bool(os.getenv("SUPABASE_URL")) and bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY")),
+            "plaid_configured": bool(os.getenv("PLAID_CLIENT_ID")) and bool(os.getenv("PLAID_SECRET")),
+            "market_data_configured": bool(os.getenv("ALPHA_VANTAGE_API_KEY")),
+        },
+    }
 
 
 @app.post("/api/optimize", response_model=OptimizationResult)
