@@ -7,6 +7,9 @@ import BrokerageLinks from '@/app/components/BrokerageLinks';
 import { ArrowLeft, Check, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useFinancialData } from '../../context/FinancialContext';
+import BetaNotice from '@/app/components/BetaNotice';
+import FeedbackPanel from '@/app/components/FeedbackPanel';
+import { getApiBaseUrl, getApiErrorMessage } from '@/lib/api';
 
 interface ETFAllocation {
   ticker: string;
@@ -93,7 +96,7 @@ export default function InvestmentPlanPage() {
     setError(null);
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL!;
+      const API_BASE_URL = getApiBaseUrl();
       const payload = {
         ...formData,
         time_horizon_years: 10,
@@ -110,8 +113,7 @@ export default function InvestmentPlanPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to generate plan: ${response.status} - ${errorText}`);
+        throw new Error(await getApiErrorMessage(response, 'Unable to generate a plan from those inputs. Please adjust the numbers and try again.'));
       }
 
       const data = await response.json();
@@ -173,6 +175,13 @@ export default function InvestmentPlanPage() {
         <p className="text-text-muted mb-8">
           Enter how much you have available to invest each month and your goals to get a personalized ETF portfolio
         </p>
+
+        <div className="mb-8">
+          <BetaNotice
+            title="Portfolio planning estimate"
+            message="This tool uses simplified assumptions and broad ETF examples. Confirm fund choices, tax treatment, and account type before placing trades."
+          />
+        </div>
 
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="bg-surface border border-border-subtle rounded-xl p-6 mb-8 space-y-8">
@@ -450,6 +459,8 @@ export default function InvestmentPlanPage() {
             </div>
 
             <BrokerageLinks />
+
+            <FeedbackPanel source="Investment Plan" />
           </div>
         )}
       </div>

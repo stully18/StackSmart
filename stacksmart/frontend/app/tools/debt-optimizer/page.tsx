@@ -7,6 +7,9 @@ import { ArrowLeft, FileText, CreditCard, TrendingUp, Rocket, BarChart3, Check }
 import type { Loan, LoanType, MultiLoanRequest, MultiLoanResult, MarketAssumptions } from '@/types';
 import { useFinancialData } from '../../context/FinancialContext';
 import { useAuth } from '../../context/AuthContext';
+import BetaNotice from '@/app/components/BetaNotice';
+import FeedbackPanel from '@/app/components/FeedbackPanel';
+import { getApiBaseUrl, getApiErrorMessage } from '@/lib/api';
 
 interface VooMarketData {
   ticker: string;
@@ -105,7 +108,7 @@ export default function DebtOptimizerPage() {
         market_assumptions: marketAssumptions
       };
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL!;
+      const API_BASE_URL = getApiBaseUrl();
       const response = await fetch(`${API_BASE_URL}/api/optimize-multi-loan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,8 +116,7 @@ export default function DebtOptimizerPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Optimization failed: ${response.status} - ${errorText}`);
+        throw new Error(await getApiErrorMessage(response, 'Unable to optimize those inputs. Please check the numbers and try again.'));
       }
 
       const data = await response.json();
@@ -142,7 +144,7 @@ export default function DebtOptimizerPage() {
     const fetchMarketData = async () => {
       setMarketDataLoading(true);
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL!;
+        const API_BASE_URL = getApiBaseUrl();
         const response = await fetch(`${API_BASE_URL}/api/market/voo-live`);
         if (response.ok) {
           const data = await response.json();
@@ -190,6 +192,13 @@ export default function DebtOptimizerPage() {
             Debt Optimizer
           </h1>
           <p className="text-text-muted">Add your loans and see which debts to pay first vs investing</p>
+
+          <div className="mt-4">
+            <BetaNotice
+              title="Manual debt planning"
+              message="Use balances, APRs, and minimum payments from your statements. StackSmart compares the math, but your emergency fund, job stability, and tax situation still matter."
+            />
+          </div>
 
           {/* Live Market Data */}
           {vooData && !vooData.error && (
@@ -488,6 +497,8 @@ export default function DebtOptimizerPage() {
             <div className="p-3 bg-surface border-l-4 border-warning rounded text-sm text-text-secondary text-center">
               <strong className="text-warning">Note:</strong> This provides mathematical guidance, not financial advice. Consider your emergency fund and personal situation.
             </div>
+
+            <FeedbackPanel source="Debt Optimizer" />
           </div>
         )}
       </div>

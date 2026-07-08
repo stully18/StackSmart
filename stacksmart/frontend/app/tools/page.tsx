@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import ToolCard from '@/components/ToolCard';
 import { CreditCard, Landmark, BarChart3, ShieldCheck } from 'lucide-react';
 import { AuroraBackground } from '@/app/components/ui/aurora-background';
+import BetaNotice from '@/app/components/BetaNotice';
 
 export default function ToolsPage() {
   const router = useRouter();
@@ -33,11 +34,11 @@ export default function ToolsPage() {
       href: '/tools/debt-optimizer',
       icon: <CreditCard size={24} />,
       title: 'Debt Optimizer',
-      description: 'Add all your loans and find the optimal payoff strategy vs investing',
+      description: 'Add your debts manually and find the best payoff strategy vs investing',
       features: [
         'Multi-loan support (student, car, credit card)',
         'Avalanche vs snowball comparison',
-        'Live VOO market data',
+        'Market return assumptions',
         'Pay debt or invest recommendation',
       ],
     },
@@ -88,9 +89,16 @@ export default function ToolsPage() {
             Financial Tools
           </h1>
           <p className="text-text-muted max-w-2xl mx-auto">
-            Everything you need to optimize your finances as a college student or new grad.
-            Start with debt optimization, then build your investment strategy.
+            Manual-first planning tools for early-career professionals. Start with debt
+            optimization, then build your retirement and investing strategy.
           </p>
+        </div>
+
+        <div className="mb-8">
+          <BetaNotice
+            title="Manual inputs are the beta-ready path"
+            message="Enter only the numbers needed for each calculator. Account linking is optional while StackSmart keeps Plaid-powered flows in beta."
+          />
         </div>
 
         {/* Tool Cards Grid */}

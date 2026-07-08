@@ -6,6 +6,8 @@ import Link from 'next/link';
 import BrokerageLinks from '@/app/components/BrokerageLinks';
 import { useAuth } from '../../context/AuthContext';
 import { ArrowLeft, DollarSign, Zap, ShieldCheck } from 'lucide-react';
+import BetaNotice from '@/app/components/BetaNotice';
+import FeedbackPanel from '@/app/components/FeedbackPanel';
 
 export default function RothIRAPage() {
   const router = useRouter();
@@ -71,10 +73,17 @@ export default function RothIRAPage() {
           </Link>
         </div>
 
-        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-text-primary mb-2">Why Roth IRA is a Superpower for College Students</h1>
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-text-primary mb-2">Roth IRA Calculator</h1>
         <p className="text-text-muted mb-8">
-          The earlier you start, the more powerful it becomes. Let the math convince you.
+          See how after-tax contributions can compound into tax-free retirement money.
         </p>
+
+        <div className="mb-8">
+          <BetaNotice
+            title="Check eligibility before contributing"
+            message="Roth IRA rules depend on earned income, filing status, and modified AGI. Use this as a planning estimate, then confirm limits before funding an account."
+          />
+        </div>
 
         {/* Key Benefits */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -329,6 +338,10 @@ export default function RothIRAPage() {
               Even if you can only contribute $1,000 this year, that's $1,000 growing tax-free for 45 years.
             </p>
           </div>
+        </div>
+
+        <div className="mt-8">
+          <FeedbackPanel source="Roth IRA Calculator" />
         </div>
       </div>
     </div>

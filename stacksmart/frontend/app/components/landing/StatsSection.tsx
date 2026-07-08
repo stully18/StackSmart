@@ -7,7 +7,7 @@ const stats = [
   { value: '4', label: 'Powerful Tools' },
   { value: '100%', label: 'Free to Use' },
   { value: 'Bank-Level', label: 'Security' },
-  { value: 'Built for', label: 'Students & Grads' },
+  { value: 'Built for', label: 'Early Careers' },
 ]
 
 export default function StatsSection() {

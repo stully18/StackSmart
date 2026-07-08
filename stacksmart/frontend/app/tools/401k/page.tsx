@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
 import { ArrowLeft, Check, X } from 'lucide-react';
+import BetaNotice from '@/app/components/BetaNotice';
+import FeedbackPanel from '@/app/components/FeedbackPanel';
 
 export default function Calculator401kPage() {
   const router = useRouter();
@@ -106,6 +108,13 @@ export default function Calculator401kPage() {
         <p className="text-text-muted mb-8">
           Calculate your retirement savings with employer matching - don't leave free money on the table!
         </p>
+
+        <div className="mb-8">
+          <BetaNotice
+            title="Use your actual plan match"
+            message="Employer match formulas vary. Check your benefits portal, then use this calculator to understand the tradeoff before changing payroll elections."
+          />
+        </div>
 
         {/* Free Money Alert */}
         {freeMoneyLeftOnTable > 0 && (
@@ -459,6 +468,10 @@ export default function Calculator401kPage() {
               Learn About Roth IRA
             </Link>
           </div>
+        </div>
+
+        <div className="mt-8">
+          <FeedbackPanel source="401(k) Calculator" />
         </div>
       </div>
     </div>
