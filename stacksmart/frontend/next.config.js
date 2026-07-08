@@ -17,7 +17,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: https: blob:",
-              "connect-src 'self' https://*.supabase.co https://fratfinance-production.up.railway.app https://vitals.vercel-insights.com http://localhost:8000 http://127.0.0.1:8000",
+              "connect-src 'self' https://*.supabase.co https://fratfinance-production.up.railway.app https://vitals.vercel-insights.com https://submit-form.com http://localhost:8000 http://127.0.0.1:8000",
               "frame-ancestors 'none'",
             ].join('; '),
           },
