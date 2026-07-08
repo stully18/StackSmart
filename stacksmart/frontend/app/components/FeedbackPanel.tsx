@@ -1,34 +1,64 @@
 'use client'
 
-import { useState } from 'react'
-import { Mail, MessageSquare, Send } from 'lucide-react'
+import { FormEvent, useState } from 'react'
+import { CheckCircle2, MessageSquare, Send, XCircle } from 'lucide-react'
+import { useAuth } from '@/app/context/AuthContext'
 
 interface FeedbackPanelProps {
   source: string
 }
 
-const SUPPORT_EMAIL = 'support@stacksmart.dev'
+const FORMSPARK_ENDPOINT = process.env.NEXT_PUBLIC_FORMSPARK_FEEDBACK_ENDPOINT
 
 export default function FeedbackPanel({ source }: FeedbackPanelProps) {
+  const { user } = useAuth()
   const [reaction, setReaction] = useState('useful')
   const [note, setNote] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
-  const sendFeedback = () => {
-    const subject = encodeURIComponent(`StackSmart beta feedback: ${source}`)
-    const body = encodeURIComponent(
-      [
-        `Flow: ${source}`,
-        `Reaction: ${reaction}`,
-        '',
-        'What I was trying to decide:',
-        note.trim() || '[add context here]',
-        '',
-        'What felt confusing or missing:',
-        '',
-      ].join('\n')
-    )
+  const sendFeedback = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
 
-    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`
+    if (!FORMSPARK_ENDPOINT || !note.trim()) return
+
+    setIsSubmitting(true)
+    setStatus('idle')
+
+    try {
+      const response = await fetch(FORMSPARK_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          source,
+          reaction,
+          message: note.trim(),
+          page_url: window.location.href,
+          user_id: user?.id ?? null,
+          user_email: user?.email ?? null,
+          submitted_at: new Date().toISOString(),
+          _email: {
+            subject: `StackSmart beta feedback: ${source}`,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Formspark returned ${response.status}`)
+      }
+
+      setNote('')
+      setReaction('useful')
+      setStatus('success')
+    } catch (error) {
+      console.error('[FeedbackPanel] Feedback submission failed:', error)
+      setStatus('error')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -44,7 +74,7 @@ export default function FeedbackPanel({ source }: FeedbackPanelProps) {
           </p>
         </div>
 
-        <div className="grid w-full gap-3 lg:max-w-md">
+        <form onSubmit={sendFeedback} className="grid w-full gap-3 lg:max-w-md">
           <select
             value={reaction}
             onChange={(event) => setReaction(event.target.value)}
@@ -61,21 +91,40 @@ export default function FeedbackPanel({ source }: FeedbackPanelProps) {
             onChange={(event) => setNote(event.target.value)}
             rows={3}
             placeholder="Example: I was deciding whether to pay off a 7% loan or increase my 401(k)."
+            required
+            minLength={8}
             className="w-full resize-none rounded-lg border border-border bg-surface-elevated/60 px-3 py-2 text-sm text-text-primary placeholder-text-muted/70 focus:border-primary focus:ring-1 focus:ring-primary/20"
           />
           <button
-            type="button"
-            onClick={sendFeedback}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-primary-hover active:scale-[0.98]"
+            type="submit"
+            disabled={isSubmitting || !FORMSPARK_ENDPOINT}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-primary-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Send size={16} />
-            Send Feedback
+            {isSubmitting ? 'Sending...' : 'Send Feedback'}
           </button>
-          <p className="flex items-center gap-2 text-xs text-text-muted">
-            <Mail size={14} />
-            Opens an email to {SUPPORT_EMAIL}; no financial details are stored by this form.
+          {status === 'success' && (
+            <p className="flex items-center gap-2 text-xs font-medium text-primary">
+              <CheckCircle2 size={14} />
+              Feedback sent. Thanks for helping improve this beta.
+            </p>
+          )}
+          {status === 'error' && (
+            <p className="flex items-center gap-2 text-xs font-medium text-red-400">
+              <XCircle size={14} />
+              Feedback did not send. Please try again in a minute.
+            </p>
+          )}
+          {!FORMSPARK_ENDPOINT && (
+            <p className="flex items-center gap-2 text-xs text-text-muted">
+              <XCircle size={14} />
+              Feedback is not configured yet. Add NEXT_PUBLIC_FORMSPARK_FEEDBACK_ENDPOINT.
+            </p>
+          )}
+          <p className="text-xs text-text-muted">
+            Avoid sharing account numbers or other sensitive financial details.
           </p>
-        </div>
+        </form>
       </div>
     </div>
   )
