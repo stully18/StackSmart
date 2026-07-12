@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import ToolCard from '@/components/ToolCard';
-import { CreditCard, Landmark, BarChart3, ShieldCheck } from 'lucide-react';
+import { CreditCard, Landmark, BarChart3, ShieldCheck, TrendingUp } from 'lucide-react';
 import { AuroraBackground } from '@/app/components/ui/aurora-background';
 import BetaNotice from '@/app/components/BetaNotice';
 
@@ -76,6 +76,18 @@ export default function ToolsPage() {
         'Early starter advantage',
         'Contribution flexibility',
         'Step-by-step guide',
+      ],
+    },
+    {
+      href: '/tools/stock-of-the-day',
+      icon: <TrendingUp size={24} />,
+      title: 'Stock of the Day',
+      description: 'A transparent, multi-factor daily stock pick with the full math shown',
+      features: [
+        'Momentum, volume, sentiment & more',
+        'Full factor score breakdown',
+        'Tracked backtest performance',
+        'Educational, not investment advice',
       ],
     },
   ];

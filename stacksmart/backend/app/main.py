@@ -646,3 +646,64 @@ async def delete_plan_endpoint(
     """Delete a saved plan"""
     result = await delete_plan(user_id, plan_name)
     return result
+
+
+# ============= Stock of the Day Endpoints =============
+
+from app.services import stock_of_the_day_query_service
+
+
+@app.get("/api/stock-of-the-day")
+async def get_stock_of_the_day(user_id: str = Depends(verify_user_token)):
+    """
+    Get the most recent Stock of the Day pick, with full factor breakdown
+    (per-factor raw value, z-score, weight, weighted contribution).
+
+    Educational tool, not investment advice.
+    """
+    try:
+        pick = stock_of_the_day_query_service.get_latest_pick()
+        if pick is None:
+            raise HTTPException(status_code=404, detail="No stock of the day pick available yet")
+        return pick
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Stock of the day fetch failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
+
+
+@app.get("/api/stock-of-the-day/history")
+async def get_stock_of_the_day_history(days: int = 30, user_id: str = Depends(verify_user_token)):
+    """
+    Get the most recent `days` Stock of the Day picks (default 30), newest first.
+    """
+    try:
+        if not 1 <= days <= 365:
+            raise HTTPException(status_code=400, detail="days must be between 1 and 365")
+        picks = stock_of_the_day_query_service.get_pick_history(days)
+        return {"picks": picks}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Stock of the day history fetch failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
+
+
+@app.get("/api/stock-of-the-day/performance")
+async def get_stock_of_the_day_performance(days: int = 90, user_id: str = Depends(verify_user_token)):
+    """
+    Get backtest performance data: per-pick 1d/5d/20d returns vs SPY, plus
+    aggregate win-rate and average-return stats for each window.
+    """
+    try:
+        if not 1 <= days <= 365:
+            raise HTTPException(status_code=400, detail="days must be between 1 and 365")
+        records = stock_of_the_day_query_service.get_performance_history(days)
+        summary = stock_of_the_day_query_service.get_performance_summary(records)
+        return {"performance": records, "summary": summary}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Stock of the day performance fetch failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal error occurred.")

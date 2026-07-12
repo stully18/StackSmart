@@ -2,9 +2,13 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 pydantic>=2.10.0
 numpy>=1.26.0
+pandas>=2.2.0
 python-dotenv>=1.0.0
 plaid-python>=17.0.0
 requests>=2.31.0
 yfinance==0.2.58
 supabase==2.6.0
+pandas_market_calendars>=4.4.0
 websockets>=11,<13
+pytest>=8.3.0
+pytest-mock>=3.14.0
