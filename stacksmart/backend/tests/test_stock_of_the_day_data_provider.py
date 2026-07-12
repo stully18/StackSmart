@@ -16,7 +16,9 @@ from app.services import stock_of_the_day_data_provider as provider
 def passthrough_cache(monkeypatch):
     """Route get_cached_or_fetch straight to fetch_fn (no real cache/DB)."""
     monkeypatch.setattr(
-        provider, "get_cached_or_fetch", lambda provider, cache_key, ttl_seconds, fetch_fn: fetch_fn()
+        provider,
+        "get_cached_or_fetch",
+        lambda provider, cache_key, ttl_seconds, fetch_fn, force_refresh=False: fetch_fn(),
     )
 
 

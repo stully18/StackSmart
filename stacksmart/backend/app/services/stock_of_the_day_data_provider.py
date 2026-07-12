@@ -145,13 +145,21 @@ def _fetch_price_history_raw(ticker: str, period: str) -> Dict:
     return {"records": records}
 
 
-def get_price_history(ticker: str, period: str = "3mo") -> pd.DataFrame:
-    """Daily OHLCV (Close/Volume only) for a ticker, via a daily-TTL cache."""
+def get_price_history(ticker: str, period: str = "3mo", force_refresh: bool = False) -> pd.DataFrame:
+    """Daily OHLCV (Close/Volume only) for a ticker, via a daily-TTL cache.
+
+    `force_refresh=True` bypasses the cache read (see get_cached_or_fetch).
+    The EOD backfill job needs this: the morning job populates this same
+    cache key hours earlier with an intraday bar, well within the 24h TTL,
+    so a plain cached read after close would silently return that stale
+    intraday price instead of the actual closing bar.
+    """
     raw = get_cached_or_fetch(
         provider="yfinance",
         cache_key=f"price_history_{ticker}_{period}",
         ttl_seconds=PRICE_HISTORY_TTL_SECONDS,
         fetch_fn=lambda: _fetch_price_history_raw(ticker, period),
+        force_refresh=force_refresh,
     )
 
     records = raw.get("records", [])

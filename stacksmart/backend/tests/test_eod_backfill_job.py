@@ -1,5 +1,7 @@
 """Unit tests for the EOD performance backfill job."""
 
+from datetime import date
+
 import pandas as pd
 import pytest
 
@@ -78,6 +80,11 @@ class _FakePerformanceTable:
         return _FakeUpsertQuery(self._upsert_calls).upsert(payload, on_conflict=on_conflict)
 
 
+def _flat_spy_history(as_of, periods=30):
+    dates = pd.bdate_range(end=as_of, periods=periods)
+    return pd.DataFrame({"Close": [200.0] * periods}, index=dates)
+
+
 class TestRun:
     def test_backfills_windows_that_have_elapsed_and_skips_ones_that_havent(self, monkeypatch):
         pick_date_iso = "2026-06-01"
@@ -89,7 +96,8 @@ class TestRun:
 
         as_of = dates[10].date()  # only 10 trading days elapsed since pick_date
 
-        def fake_price_history(ticker, period="3mo"):
+        def fake_price_history(ticker, period="3mo", force_refresh=False):
+            assert force_refresh is True  # EOD must always bypass the cache
             full = spy_history if ticker == "SPY" else ticker_history
             return full[full.index.date <= as_of]
 
@@ -114,22 +122,30 @@ class TestRun:
         assert "return_20d" not in payload
 
     def test_pick_made_today_is_skipped(self, monkeypatch):
-        as_of_iso = "2026-06-01"
+        as_of = date(2026, 6, 1)
         client = _FakeClient(
-            picks_rows=[{"pick_date": as_of_iso, "ticker": "AAA"}],
+            picks_rows=[{"pick_date": as_of.isoformat(), "ticker": "AAA"}],
             performance_rows_by_date={},
             upsert_calls=[],
         )
         monkeypatch.setattr(job, "get_supabase_client", lambda: client)
-        monkeypatch.setattr(job, "get_price_history", lambda *a, **k: pytest.fail("should not fetch"))
+        # SPY is still fetched once up front regardless; only a per-ticker
+        # fetch for "AAA" would indicate the skip logic didn't fire.
+        monkeypatch.setattr(
+            job,
+            "get_price_history",
+            lambda ticker, period="3mo", force_refresh=False: _flat_spy_history(as_of)
+            if ticker == "SPY"
+            else pytest.fail("should not fetch a skipped ticker's history"),
+        )
 
-        from datetime import date
-        written = job.run(as_of=date.fromisoformat(as_of_iso))
+        written = job.run(as_of=as_of)
 
         assert written == 0
 
     def test_fully_backfilled_pick_is_skipped(self, monkeypatch):
         pick_date_iso = "2026-05-01"
+        as_of = date(2026, 7, 1)
         existing_row = {
             "pick_date": pick_date_iso,
             "return_1d": 0.01,
@@ -143,15 +159,21 @@ class TestRun:
             upsert_calls=upsert_calls,
         )
         monkeypatch.setattr(job, "get_supabase_client", lambda: client)
-        monkeypatch.setattr(job, "get_price_history", lambda *a, **k: pytest.fail("should not fetch"))
+        monkeypatch.setattr(
+            job,
+            "get_price_history",
+            lambda ticker, period="3mo", force_refresh=False: _flat_spy_history(as_of)
+            if ticker == "SPY"
+            else pytest.fail("should not fetch a fully-backfilled ticker's history"),
+        )
 
-        from datetime import date
-        written = job.run(as_of=date(2026, 7, 1))
+        written = job.run(as_of=as_of)
 
         assert written == 0
         assert upsert_calls == []
 
     def test_price_fetch_failure_for_one_ticker_does_not_crash(self, monkeypatch):
+        as_of = date(2026, 6, 15)
         upsert_calls = []
         client = _FakeClient(
             picks_rows=[{"pick_date": "2026-06-01", "ticker": "BROKEN"}],
@@ -160,12 +182,44 @@ class TestRun:
         )
         monkeypatch.setattr(job, "get_supabase_client", lambda: client)
 
+        def fake_price_history(ticker, period="3mo", force_refresh=False):
+            if ticker == "SPY":
+                return _flat_spy_history(as_of)
+            raise Exception("yfinance is down for this ticker")
+
+        monkeypatch.setattr(job, "get_price_history", fake_price_history)
+
+        written = job.run(as_of=as_of)
+
+        assert written == 0
+
+    def test_spy_fetch_failure_propagates_and_does_not_report_success(self, monkeypatch):
+        client = _FakeClient(
+            picks_rows=[{"pick_date": "2026-06-01", "ticker": "AAA"}],
+            performance_rows_by_date={},
+            upsert_calls=[],
+        )
+        monkeypatch.setattr(job, "get_supabase_client", lambda: client)
+
         def raise_error(*a, **k):
             raise Exception("yfinance is down")
 
         monkeypatch.setattr(job, "get_price_history", raise_error)
 
-        from datetime import date
-        written = job.run(as_of=date(2026, 6, 15))
+        with pytest.raises(Exception):
+            job.run(as_of=date(2026, 6, 15))
 
-        assert written == 0
+    def test_initial_picks_query_failure_propagates(self, monkeypatch):
+        class _BrokenClient:
+            def table(self, _name):
+                class _BrokenQuery:
+                    def select(self, *a, **k):
+                        raise Exception("connection refused")
+
+                return _BrokenQuery()
+
+        monkeypatch.setattr(job, "get_supabase_client", lambda: _BrokenClient())
+        monkeypatch.setattr(job, "get_price_history", lambda *a, **k: pytest.fail("should not reach price fetch"))
+
+        with pytest.raises(Exception):
+            job.run(as_of=date(2026, 6, 15))

@@ -19,7 +19,13 @@ def get_supabase_client() -> Client:
     return create_client(url, key)
 
 
-def get_cached_or_fetch(provider: str, cache_key: str, ttl_seconds: int, fetch_fn: Callable[[], Any]) -> Any:
+def get_cached_or_fetch(
+    provider: str,
+    cache_key: str,
+    ttl_seconds: int,
+    fetch_fn: Callable[[], Any],
+    force_refresh: bool = False,
+) -> Any:
     """Return the cached `response` for (provider, cache_key) if still within
     its TTL; otherwise call `fetch_fn`, store the result, and return it.
 
@@ -32,25 +38,32 @@ def get_cached_or_fetch(provider: str, cache_key: str, ttl_seconds: int, fetch_f
     result. `fetch_fn` itself is never caught here — if it raises, that's a
     real failure and must propagate so the caller doesn't treat it as valid
     data.
+
+    `force_refresh=True` skips the read entirely and always calls `fetch_fn`
+    (still writing the result to cache). Needed by callers where the daily
+    TTL isn't the right freshness signal — e.g. the EOD backfill job needs
+    the post-close bar even though the morning job already populated this
+    same (provider, cache_key) earlier today, well within its 24h TTL.
     """
     supabase = get_supabase_client()
 
-    try:
-        existing = (
-            supabase.table("market_data_cache")
-            .select("response, fetched_at, ttl_seconds")
-            .eq("provider", provider)
-            .eq("cache_key", cache_key)
-            .execute()
-        )
-        if existing.data:
-            row = existing.data[0]
-            fetched_at = datetime.fromisoformat(row["fetched_at"])
-            age_seconds = (datetime.now(timezone.utc) - fetched_at).total_seconds()
-            if age_seconds < row["ttl_seconds"]:
-                return row["response"]
-    except Exception as e:
-        print(f"[ERROR] Cache read failed for {provider}/{cache_key}, falling back to fetch: {str(e)}")
+    if not force_refresh:
+        try:
+            existing = (
+                supabase.table("market_data_cache")
+                .select("response, fetched_at, ttl_seconds")
+                .eq("provider", provider)
+                .eq("cache_key", cache_key)
+                .execute()
+            )
+            if existing.data:
+                row = existing.data[0]
+                fetched_at = datetime.fromisoformat(row["fetched_at"])
+                age_seconds = (datetime.now(timezone.utc) - fetched_at).total_seconds()
+                if age_seconds < row["ttl_seconds"]:
+                    return row["response"]
+        except Exception as e:
+            print(f"[ERROR] Cache read failed for {provider}/{cache_key}, falling back to fetch: {str(e)}")
 
     fresh = fetch_fn()
 

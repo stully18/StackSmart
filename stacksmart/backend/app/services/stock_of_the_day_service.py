@@ -296,15 +296,49 @@ def score_candidates(
     return results
 
 
+def _coverage_fraction(raw_factors: Dict[str, Optional[float]], weights: Dict[str, float]) -> float:
+    """Fraction of the total factor weight for which this candidate has a
+    real (non-missing) raw value."""
+    total_weight = sum(weights.values())
+    if total_weight == 0:
+        return 0.0
+    available_weight = sum(w for f, w in weights.items() if raw_factors.get(f) is not None)
+    return available_weight / total_weight
+
+
 def pick_stock_of_the_day(
     raw_factors_by_ticker: Dict[str, Dict[str, Optional[float]]],
     weights: Optional[Dict[str, float]] = None,
+    min_coverage_fraction: float = 0.0,
 ) -> Tuple[str, Dict]:
-    """Return the (ticker, result) with the highest composite score."""
+    """Return the (ticker, result) with the highest composite score.
+
+    `min_coverage_fraction` excludes a candidate from winning if less than
+    that fraction of the total factor weight came from real data — without
+    this, weight redistribution (see score_candidates) means a candidate
+    missing, say, news_sentiment and analyst_revision (35% of the model)
+    could still win on the strength of the remaining 65%, which makes it
+    hard to compare against a fully-covered candidate on equal footing. If
+    every candidate is below the threshold (e.g. a data-provider outage),
+    falls back to picking among all of them anyway — publishing a
+    lower-confidence pick beats publishing none.
+    """
     if not raw_factors_by_ticker:
         raise ValueError("raw_factors_by_ticker must contain at least one candidate")
+
+    weights = weights or DEFAULT_WEIGHTS
     scored = score_candidates(raw_factors_by_ticker, weights)
-    return max(scored.items(), key=lambda kv: kv[1]["composite_score"])
+
+    eligible = {
+        ticker: result
+        for ticker, result in scored.items()
+        if _coverage_fraction(raw_factors_by_ticker[ticker], weights) >= min_coverage_fraction
+    }
+    if not eligible:
+        print("[ERROR] No candidate meets the minimum data-coverage threshold; picking among all candidates anyway.")
+        eligible = scored
+
+    return max(eligible.items(), key=lambda kv: kv[1]["composite_score"])
 
 
 # ============= Data fetching (yfinance) =============

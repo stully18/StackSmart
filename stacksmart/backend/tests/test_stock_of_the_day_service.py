@@ -192,6 +192,44 @@ class TestScoreCandidates:
         assert scored["AAA"]["composite_score"] == 0.0
 
 
+class TestMinCoverageFraction:
+    def test_thin_data_candidate_excluded_from_winning_despite_higher_score(self):
+        # AAA is missing news_sentiment + analyst_revision (35% of weight)
+        # but scores well on what little it has. BBB has full data with a
+        # more modest score. Without a coverage floor AAA could still win;
+        # with one, BBB should win instead.
+        raw_factors = {
+            "AAA": {"momentum": 5.0, "volume": 5.0, "analyst_revision": None,
+                     "news_sentiment": None, "technical_setup": 5.0, "vol_adjusted_momentum": 5.0},
+            "BBB": {"momentum": 1.0, "volume": 1.0, "analyst_revision": 1.0,
+                     "news_sentiment": 1.0, "technical_setup": 1.0, "vol_adjusted_momentum": 1.0},
+        }
+        ticker, _ = pick_stock_of_the_day(raw_factors, min_coverage_fraction=0.7)
+        assert ticker == "BBB"
+
+    def test_default_threshold_of_zero_preserves_prior_behavior(self):
+        raw_factors = {
+            "AAA": {"momentum": 5.0, "volume": 5.0, "analyst_revision": None,
+                     "news_sentiment": None, "technical_setup": 5.0, "vol_adjusted_momentum": 5.0},
+            "BBB": {"momentum": 1.0, "volume": 1.0, "analyst_revision": 1.0,
+                     "news_sentiment": 1.0, "technical_setup": 1.0, "vol_adjusted_momentum": 1.0},
+        }
+        ticker, _ = pick_stock_of_the_day(raw_factors)  # no min_coverage_fraction passed
+        assert ticker == "AAA"
+
+    def test_falls_back_to_all_candidates_when_none_meet_threshold(self):
+        raw_factors = {
+            "AAA": {"momentum": 5.0, "volume": None, "analyst_revision": None,
+                     "news_sentiment": None, "technical_setup": None, "vol_adjusted_momentum": None},
+            "BBB": {"momentum": 1.0, "volume": None, "analyst_revision": None,
+                     "news_sentiment": None, "technical_setup": None, "vol_adjusted_momentum": None},
+        }
+        # Neither candidate meets a 0.7 threshold, but a pick still comes back.
+        ticker, result = pick_stock_of_the_day(raw_factors, min_coverage_fraction=0.7)
+        assert ticker in raw_factors
+        assert result is not None
+
+
 # ============= Individual factor calculators =============
 
 def _make_price_series(prices):

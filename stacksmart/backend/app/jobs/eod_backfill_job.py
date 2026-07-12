@@ -6,16 +6,27 @@ returns for the same windows) have now come due. Trading-day counting comes
 directly from the fetched price series (it only contains days the market was
 open), so no separate market-calendar dependency is needed here.
 
+Uses force_refresh=True for every price fetch: the morning job populates
+the same daily-TTL cache keys hours earlier with an intraday bar, so a
+plain cached read here after close would silently return that stale
+intraday price instead of the actual closing price.
+
 Idempotent: re-running always recomputes price_at_pick and any due windows
 and upserts via the pick_date UNIQUE constraint, so a retry after a partial
 failure just re-fills what's still missing rather than erroring or
-duplicating.
+duplicating. A failure fetching one ticker's history is logged and that
+pick is skipped for this run (retried next run); a failure on the initial
+query for which picks need backfilling is NOT caught here, so it propagates
+and the process exits non-zero — that one is a real "the whole job can't
+proceed" failure, not a per-item one.
 
 Run daily after market close: python -m app.jobs.eod_backfill_job
-Scheduled via Railway cron — see railway.json.
+Scheduled via Railway cron (dashboard-configured; see morning_pick_job.py's
+module docstring for the DST-safe scheduling approach shared by both jobs).
 """
 
 import os
+import sys
 from datetime import date, datetime
 from typing import Dict, List, Optional
 from zoneinfo import ZoneInfo
@@ -63,10 +74,9 @@ def _price_n_trading_days_after(closes: pd.Series, pick_date: date, n: int) -> O
     return float(future.iloc[n - 1])
 
 
-def _compute_update(ticker: str, pick_date: date) -> Optional[Dict]:
+def _compute_update(ticker: str, pick_date: date, spy_closes: pd.Series) -> Optional[Dict]:
     try:
-        ticker_closes = get_price_history(ticker, period="3mo")["Close"]
-        spy_closes = get_price_history("SPY", period="3mo")["Close"]
+        ticker_closes = get_price_history(ticker, period="3mo", force_refresh=True)["Close"]
     except Exception as e:
         print(f"[ERROR] Backfill: price history fetch failed for {ticker}: {str(e)}")
         return None
@@ -98,11 +108,18 @@ def _compute_update(ticker: str, pick_date: date) -> Optional[Dict]:
 
 def run(as_of: Optional[date] = None) -> int:
     """Backfill performance rows due for an update as of `as_of` (default:
-    today in America/New_York). Returns the count of rows written."""
+    today in America/New_York). Returns the count of rows written.
+
+    The initial picks query and the SPY history fetch are not wrapped in
+    try/except: if either fails, that's not a "skip this one item"
+    situation — nothing in this run can proceed, so it propagates and the
+    process exits non-zero (see __main__ below)."""
     as_of = as_of or datetime.now(ZoneInfo("America/New_York")).date()
     supabase = get_supabase_client()
 
     picks = _fetch_picks_needing_backfill(supabase)
+    spy_closes = get_price_history("SPY", period="3mo", force_refresh=True)["Close"]
+
     written = 0
 
     for pick in picks:
@@ -115,7 +132,7 @@ def run(as_of: Optional[date] = None) -> int:
         if existing and all(existing.get(f"return_{w}d") is not None for w in WINDOWS):
             continue  # fully backfilled already
 
-        update = _compute_update(ticker, pick_date)
+        update = _compute_update(ticker, pick_date, spy_closes)
         if update is None:
             continue
 
@@ -131,4 +148,8 @@ def run(as_of: Optional[date] = None) -> int:
 
 
 if __name__ == "__main__":
-    run()
+    try:
+        run()
+    except Exception as e:
+        print(f"[ERROR] EOD backfill job failed: {str(e)}")
+        sys.exit(1)
