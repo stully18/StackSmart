@@ -68,6 +68,49 @@ export interface MultiLoanRequest {
   market_assumptions: MarketAssumptions;
 }
 
+// ============= Persisted User Loans (Supabase `public.user_loans`) =============
+
+// A single row in the `user_loans` table. `interest_rate_percent` is the
+// UI-entered percentage value (e.g. 7.5), NOT a decimal.
+export interface UserLoanRow {
+  id: string;
+  user_id: string;
+  loan_type: LoanType;
+  loan_name: string;
+  principal: number;
+  interest_rate_percent: number;
+  minimum_payment: number;
+  term_months: number | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Insert/update payload (server-managed timestamps excluded).
+export type UserLoanUpsert = Omit<UserLoanRow, 'created_at' | 'updated_at'>;
+
+// ============= App Event Logging =============
+
+// Whitelist of known event types recorded in `public.app_events`.
+// Mirrors the SQL check constraint on `app_events.event_type`.
+export type AppEventType =
+  | 'account_created'
+  | 'sign_in'
+  | 'sign_out'
+  | 'loan_added'
+  | 'loan_removed'
+  | 'loan_saved'
+  | 'report_spawned'
+  | 'report_generated'
+  | 'feedback_submitted';
+
+// Payload for the `add_user_loan` RPC. Same shape as a UI `Loan` minus the
+// server-assigned `id`, with an optional `sort_order`. `interest_rate` is the
+// UI percentage (e.g. 7.5), which the RPC stores as `interest_rate_percent`.
+export type AddUserLoanInput = Omit<Loan, 'id'> & {
+  sort_order?: number | null;
+};
+
 export interface DebtPriority {
   loan_name: string;
   loan_type: string;

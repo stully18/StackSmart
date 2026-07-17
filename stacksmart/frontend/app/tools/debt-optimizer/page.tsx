@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import BetaNotice from '@/app/components/BetaNotice';
 import FeedbackPanel from '@/app/components/FeedbackPanel';
 import { getApiBaseUrl, getApiErrorMessage } from '@/lib/api';
+import { loadUserLoans, replaceUserLoans, addUserLoan, removeUserLoan, logAppEvent } from '@/lib/loans';
 
 interface VooMarketData {
   ticker: string;
@@ -34,6 +35,9 @@ export default function DebtOptimizerPage() {
   const [error, setError] = useState<string | null>(null);
   const [vooData, setVooData] = useState<VooMarketData | null>(null);
   const [marketDataLoading, setMarketDataLoading] = useState(false);
+  const [isLoadingSavedLoans, setIsLoadingSavedLoans] = useState(false);
+  const [isSavingLoans, setIsSavingLoans] = useState(false);
+  const [savedLoansMessage, setSavedLoansMessage] = useState<string | null>(null);
 
   // Redirect to login only AFTER auth finishes loading and there's truly no user
   useEffect(() => {
@@ -41,6 +45,39 @@ export default function DebtOptimizerPage() {
       router.push('/auth/login');
     }
   }, [user, authLoading, router]);
+
+  // Load the signed-in user's saved loans once auth resolves.
+  useEffect(() => {
+    if (!user) return;
+
+    let isMounted = true;
+
+    const fetchSavedLoans = async () => {
+      setIsLoadingSavedLoans(true);
+      setSavedLoansMessage(null);
+
+      try {
+        const savedLoans = await loadUserLoans();
+        if (isMounted) {
+          setLoans(savedLoans);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Failed to load saved loans');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingSavedLoans(false);
+        }
+      }
+    };
+
+    fetchSavedLoans();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   // Sync monthly budget to context when it changes
   useEffect(() => {
@@ -56,9 +93,13 @@ export default function DebtOptimizerPage() {
     updateFinancialData({ totalDebt });
   }, [loans]);
 
-  const addLoan = () => {
-    const newLoan: Loan = {
-      id: `loan-${Date.now()}`,
+  // Add a loan: optimistic client row, then persist via the `add_user_loan`
+  // RPC and reconcile the temporary id with the server-assigned id. Rolls back
+  // to the previous list if the RPC fails.
+  const addLoan = async () => {
+    const tempId = crypto.randomUUID();
+    const optimisticLoan: Loan = {
+      id: tempId,
       loan_type: 'student_loan',
       loan_name: `Loan ${loans.length + 1}`,
       principal: 0,
@@ -66,11 +107,41 @@ export default function DebtOptimizerPage() {
       minimum_payment: 0,
       term_months: 120
     };
-    setLoans([...loans, newLoan]);
+
+    const previous = loans;
+    setLoans([...loans, optimisticLoan]);
+    setError(null);
+
+    try {
+      const saved = await addUserLoan({
+        loan_type: optimisticLoan.loan_type,
+        loan_name: optimisticLoan.loan_name,
+        principal: optimisticLoan.principal,
+        interest_rate: optimisticLoan.interest_rate,
+        minimum_payment: optimisticLoan.minimum_payment,
+        term_months: optimisticLoan.term_months,
+      });
+      // Swap the optimistic row for the persisted row (server id + sort_order).
+      setLoans((current) => current.map((l) => (l.id === tempId ? saved : l)));
+    } catch (err) {
+      setLoans(previous);
+      setError(err instanceof Error ? err.message : 'Failed to add loan');
+    }
   };
 
-  const removeLoan = (id: string) => {
-    setLoans(loans.filter(l => l.id !== id));
+  // Remove a loan: optimistic removal, then persist via the
+  // `remove_user_loan` RPC. Rolls back if the RPC fails.
+  const removeLoan = async (id: string) => {
+    const previous = loans;
+    setLoans(loans.filter((l) => l.id !== id));
+    setError(null);
+
+    try {
+      await removeUserLoan(id);
+    } catch (err) {
+      setLoans(previous);
+      setError(err instanceof Error ? err.message : 'Failed to remove loan');
+    }
   };
 
   const updateLoan = (id: string, field: keyof Loan, value: any) => {
@@ -125,6 +196,34 @@ export default function DebtOptimizerPage() {
       setError(err instanceof Error ? err.message : 'Failed to optimize');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveLoans = async () => {
+    if (!user) {
+      setError('Please sign in to save loans');
+      return;
+    }
+
+    setIsSavingLoans(true);
+    setError(null);
+    setSavedLoansMessage(null);
+
+    try {
+      await replaceUserLoans(user.id, loans);
+      setSavedLoansMessage('Loans saved. They will be here next time you sign in.');
+      // Best-effort event log; never block on it or surface its failure.
+      try {
+        await logAppEvent('loan_saved', { source: 'debt_optimizer_save', count: loans.length });
+      } catch (eventErr) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[DebtOptimizer] loan_saved event logging failed:', eventErr);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save loans');
+    } finally {
+      setIsSavingLoans(false);
     }
   };
 
@@ -250,12 +349,24 @@ export default function DebtOptimizerPage() {
         <div className="bg-surface border border-border-subtle rounded-xl p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-semibold tracking-tight text-text-primary">Your Loans</h2>
-            <button
-              onClick={addLoan}
-              className="px-4 py-2 bg-primary hover:bg-primary-hover text-[#0f2a00] rounded-lg transition-colors font-semibold text-sm active:scale-[0.98]"
-            >
-              + Add Loan
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              {isLoadingSavedLoans && (
+                <span className="text-xs text-text-muted">Loading saved loans...</span>
+              )}
+              <button
+                onClick={handleSaveLoans}
+                disabled={isSavingLoans || isLoadingSavedLoans}
+                className="px-4 py-2 bg-surface-elevated hover:bg-surface border border-border text-text-secondary hover:text-text-primary rounded-lg transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingLoans ? 'Saving...' : 'Save Loans'}
+              </button>
+              <button
+                onClick={addLoan}
+                className="px-4 py-2 bg-primary hover:bg-primary-hover text-[#0f2a00] rounded-lg transition-colors font-semibold text-sm active:scale-[0.98]"
+              >
+                + Add Loan
+              </button>
+            </div>
           </div>
 
           {loans.length === 0 ? (
@@ -389,6 +500,12 @@ export default function DebtOptimizerPage() {
           {error && (
             <div className="mt-4 p-3 bg-surface border-l-4 border-destructive rounded text-destructive text-sm">
               {error}
+            </div>
+          )}
+
+          {savedLoansMessage && (
+            <div className="mt-4 p-3 bg-surface border-l-4 border-success rounded text-success text-sm">
+              {savedLoansMessage}
             </div>
           )}
         </div>

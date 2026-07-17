@@ -10,6 +10,7 @@ import { useFinancialData } from '../../context/FinancialContext';
 import BetaNotice from '@/app/components/BetaNotice';
 import FeedbackPanel from '@/app/components/FeedbackPanel';
 import { getApiBaseUrl, getApiErrorMessage } from '@/lib/api';
+import { logAppEvent } from '@/lib/loans';
 
 interface ETFAllocation {
   ticker: string;
@@ -118,6 +119,15 @@ export default function InvestmentPlanPage() {
 
       const data = await response.json();
       setPlan(data);
+
+      // Best-effort event log; never block on it or surface its failure.
+      try {
+        await logAppEvent('report_generated', { source: 'investment_plan', risk_tolerance: formData.risk_tolerance });
+      } catch (eventErr) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[InvestmentPlan] report_generated event logging failed:', eventErr);
+        }
+      }
 
       // Sync form data back to context
       updateFinancialData({

@@ -75,7 +75,81 @@ This document describes the database schema for StackSmart, which runs on Supaba
 }
 ```
 
-### 3. plaid_accounts
+### 3. user_loans
+
+**Purpose:** Stores each user's saved Debt Optimizer loan list as one row per loan, so loans persist across page refresh/navigation instead of living only in frontend React state.
+
+**Columns:**
+- `id` (UUID, PRIMARY KEY): Unique identifier for this loan record
+- `user_id` (UUID, NOT NULL): Links to the user who owns this loan
+- `loan_type` (TEXT, NOT NULL): Type of loan - one of:
+  - `student_loan`: Student loan
+  - `car_loan`: Auto loan
+  - `credit_card`: Credit card balance
+  - `personal_loan`: Personal loan
+  - `other`: Other debt
+- `loan_name` (TEXT, NOT NULL): User-friendly name for the loan
+- `principal` (NUMERIC(14,2), NOT NULL): Outstanding loan balance, must be >= 0
+- `interest_rate_percent` (NUMERIC(7,4), NOT NULL): Annual interest rate as the **UI percent value** (e.g. `7.5` meaning 7.5%, NOT the decimal `0.075`), constrained between 0 and 100
+- `minimum_payment` (NUMERIC(14,2), NOT NULL): Minimum monthly payment, must be >= 0
+- `term_months` (INTEGER, NULLABLE): Loan term in months; must be > 0 when provided
+- `sort_order` (INTEGER, NOT NULL DEFAULT 0): User-visible ordering of loans within a user's list
+- `created_at` (TIMESTAMP WITH TIME ZONE): When the loan record was created
+- `updated_at` (TIMESTAMP WITH TIME ZONE): When the loan record was last modified (auto-maintained by trigger)
+
+**Constraints:**
+- Foreign Key to `auth.users(id)` with CASCADE delete
+- CHECK on `loan_type` restricting to the allowed set
+- CHECKs ensuring non-negative `principal`, `minimum_payment`, and a valid `interest_rate_percent` in [0, 100]
+- **No** `UNIQUE(user_id, loan_name)` constraint: real users may hold multiple loans with the same servicer/name, so duplicate names are intentionally allowed
+
+**Indexes:**
+- `user_loans_user_id_sort_order_idx` on `(user_id, sort_order, created_at)` for fast retrieval of a user's loans in display order
+
+**Security:**
+- RLS enabled
+- Users can only READ their own loans
+- Users can only CREATE loans for themselves
+- Users can only UPDATE their own loans
+- Users can only DELETE their own loans
+- `anon` role has no table grants; `authenticated` and `service_role` do
+- `updated_at` is maintained by the `set_user_loans_updated_at()` trigger (NOT SECURITY DEFINER)
+
+### 4. app_events
+
+**Purpose:** Append-only log of notable application events (e.g. account creation, loan added/removed, report generated, feedback submitted). `user_id` is nullable so service-level/system events can also be recorded.
+
+**Columns:**
+- `id` (UUID, PRIMARY KEY): Unique identifier for this event record
+- `user_id` (UUID, NULLABLE): Links to the user this event belongs to; NULL for service-level/system events
+- `event_type` (TEXT, NOT NULL): Category of event, constrained to:
+  - `account_created`
+  - `sign_in`
+  - `sign_out`
+  - `loan_added`
+  - `loan_removed`
+  - `loan_saved`
+  - `report_spawned`
+  - `report_generated`
+  - `feedback_submitted`
+- `occurred_at` (TIMESTAMP WITH TIME ZONE): Server-side timestamp for when the event was recorded
+- `metadata` (JSONB, NOT NULL, DEFAULT `{}`): Arbitrary event metadata such as source, loan id, loan type, or report context
+
+**Constraints:**
+- Foreign Key to `auth.users(id)` with SET NULL delete (events can remain after user deletion without retaining an auth FK)
+- CHECK on `event_type` restricting to the allowed set above
+
+**Indexes:**
+- `app_events_user_id_occurred_at_idx` on `(user_id, occurred_at DESC)` for fast per-user event retrieval, newest first
+- `app_events_event_type_occurred_at_idx` on `(event_type, occurred_at DESC)` for event-type analytics
+
+**Security:**
+- RLS enabled
+- Authenticated users can INSERT events for themselves
+- Client roles (`anon`, `authenticated`) cannot SELECT/UPDATE/DELETE events
+- `anon` role has no table grants; `authenticated` has INSERT only; `service_role` has full table privileges
+
+### 5. plaid_accounts
 
 **Purpose:** Stores references to user's bank accounts connected via Plaid, including encrypted access tokens.
 
@@ -107,6 +181,31 @@ This document describes the database schema for StackSmart, which runs on Supaba
 - Users can only DELETE their own connections
 - **Note:** No UPDATE policy - connections should be recreated rather than updated
 - Access tokens are encrypted at rest in Supabase
+
+## Functions (RPC)
+
+All functions below are defined `SECURITY INVOKER` (run with the caller's privileges; they never bypass RLS) with `search_path = public` to prevent search_path injection. EXECUTE is granted to `authenticated` and `service_role`; it is explicitly revoked from `anon` (and `public`). Because they are SECURITY INVOKER and use `auth.uid()` for ownership, RLS on the underlying tables governs every write, so a caller cannot forge ownership of another user's rows.
+
+### log_app_event(p_event_type, p_metadata)
+Records a single event into `public.app_events` and returns the inserted event id.
+
+- **Arguments:**
+  - `p_event_type` (TEXT, NOT NULL): event category
+  - `p_metadata` (JSONB, DEFAULT `{}`): event metadata
+- **Returns:** UUID of the inserted event
+
+### add_user_loan(p_loan_type, p_loan_name, p_principal, p_interest_rate_percent, p_minimum_payment, p_term_months, p_sort_order)
+Inserts one loan for the caller (governed by `user_loans` RLS) and logs a `loan_added` event via `log_app_event`.
+
+- **Arguments:** same fields as `user_loans` (`loan_type`, `loan_name`, `principal`, `interest_rate_percent`, `minimum_payment`, `term_months`), plus optional `p_sort_order`
+- **Returns:** `public.user_loans` (the inserted row)
+
+### remove_user_loan(p_loan_id)
+Deletes the caller's loan (restricted by `auth.uid() = user_id`) and logs a `loan_removed` event.
+
+- **Arguments:**
+  - `p_loan_id` (UUID, NOT NULL): the loan to remove
+- **Returns:** UUID of the deleted loan
 
 ## Row Level Security (RLS)
 
@@ -146,8 +245,8 @@ This policy says: "For SELECT operations, only show rows where the authenticated
 2. Select your StackSmart project
 3. Go to **SQL Editor** in the left sidebar
 4. Click **New Query**
-5. Copy the entire contents of `backend/migrations/001_create_schema.sql`
-6. Paste into the SQL editor
+5. Copy the entire contents of `backend/migrations/001_create_schema.sql` **and** `backend/migrations/002_create_user_loans.sql`
+6. Paste both into the SQL editor (run `001` first, then `002`)
 7. Click **RUN** (or press Ctrl+Enter)
 8. Verify all statements executed successfully (no red errors)
 
@@ -179,9 +278,11 @@ psql postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres < backend
 ### Via Supabase Dashboard
 
 1. Go to **Table Editor** in the left sidebar
-2. You should see three new tables:
+2. You should see five new tables:
    - `users_public`
    - `financial_data`
+   - `user_loans`
+   - `app_events`
    - `plaid_accounts`
 3. Click each table to verify columns match the schema above
 
@@ -193,10 +294,10 @@ Run this query in the SQL Editor to verify table creation:
 SELECT table_name
 FROM information_schema.tables
 WHERE table_schema = 'public'
-AND table_name IN ('users_public', 'financial_data', 'plaid_accounts');
+AND table_name IN ('users_public', 'financial_data', 'user_loans', 'app_events', 'plaid_accounts');
 ```
 
-Expected output: 3 rows with the three table names
+Expected output: 5 rows with the five table names
 
 ### Verify RLS Policies
 
@@ -208,10 +309,26 @@ SELECT
   tablename,
   rowsecurity
 FROM pg_tables
-WHERE tablename IN ('users_public', 'financial_data', 'plaid_accounts');
+WHERE tablename IN ('users_public', 'financial_data', 'user_loans', 'app_events', 'plaid_accounts');
 ```
 
-Expected: All three tables should show `rowsecurity | true`
+Expected: All five tables should show `rowsecurity | true`
+
+### Verify user_loans Policies
+
+```sql
+SELECT policyname, cmd, roles
+FROM pg_policies
+WHERE schemaname = 'public'
+  AND tablename = 'user_loans'
+ORDER BY policyname;
+```
+
+Expected: four policies for SELECT/INSERT/UPDATE/DELETE, all scoped to `authenticated`:
+- `Users can read own loans` (SELECT)
+- `Users can insert own loans` (INSERT)
+- `Users can update own loans` (UPDATE)
+- `Users can delete own loans` (DELETE)
 
 ### Verify Indexes
 
@@ -220,13 +337,53 @@ Run this to check indexes were created:
 ```sql
 SELECT indexname
 FROM pg_indexes
-WHERE tablename IN ('users_public', 'financial_data', 'plaid_accounts');
+WHERE tablename IN ('users_public', 'financial_data', 'user_loans', 'app_events', 'plaid_accounts');
 ```
 
 Expected output should include:
 - `users_public_email_idx`
 - `financial_data_user_id_idx`
+- `user_loans_user_id_sort_order_idx`
+- `app_events_user_id_occurred_at_idx`
+- `app_events_event_type_occurred_at_idx`
 - `plaid_accounts_user_id_idx`
+
+### Verify Functions / RPCs
+
+Run this to verify the three loan-lifecycle RPCs exist and are SECURITY INVOKER:
+
+```sql
+SELECT
+  p.proname AS function_name,
+ CASE
+    WHEN p.prosecdef THEN 'SECURITY DEFINER'
+    ELSE 'SECURITY INVOKER'
+  END AS security_type
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.proname IN ('log_app_event', 'add_user_loan', 'remove_user_loan')
+ORDER BY p.proname;
+```
+
+Expected: three rows, all with `security_type | SECURITY INVOKER`.
+
+### Verify Function Grants
+
+```sql
+SELECT
+  p.proname AS function_name,
+  r.rolname AS role,
+  has_function_privilege(r.oid, p.oid, 'EXECUTE') AS execute_granted
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+CROSS JOIN (SELECT oid, rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated', 'service_role')) r
+WHERE n.nspname = 'public'
+  AND p.proname IN ('log_app_event', 'add_user_loan', 'remove_user_loan')
+ORDER BY p.proname, r.rolname;
+```
+
+Expected: `authenticated` and `service_role` have `execute_granted | true`; `anon` has `execute_granted | false`.
 
 ## Testing the Security Model
 
@@ -287,6 +444,6 @@ The RLS policies may not have been created. Verify all `CREATE POLICY` statement
 This is likely correct - RLS is working! If you try to query as the wrong user, you get 0 rows. Make sure you're authenticated as the user who owns the data.
 
 ## File Reference
-
 - Migration file: `/backend/migrations/001_create_schema.sql`
+- Migration file: `/backend/migrations/002_create_user_loans.sql`
 - This documentation: `/docs/DATABASE-SCHEMA.md`
