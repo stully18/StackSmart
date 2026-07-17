@@ -45,10 +45,28 @@ interface PersonalizedPlanResult {
   months_to_emergency_fund: number | null;
 }
 
+interface InvestmentPlanFormData {
+  monthly_investment_amount: number | '';
+  risk_tolerance: '' | 'conservative' | 'moderate' | 'aggressive';
+  financial_goal: '' | 'wealth_building' | 'income_generation' | 'capital_preservation' | 'debt_freedom';
+  current_savings: number | '';
+  has_emergency_fund: boolean;
+  include_roth_ira: boolean;
+}
+
+const emptyFormData: InvestmentPlanFormData = {
+  monthly_investment_amount: '',
+  risk_tolerance: '',
+  financial_goal: '',
+  current_savings: '',
+  has_emergency_fund: false,
+  include_roth_ira: false,
+};
+
 export default function InvestmentPlanPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
-  const { financialData, updateFinancialData } = useFinancialData();
+  const { updateFinancialData } = useFinancialData();
 
   // Redirect to login only AFTER auth finishes loading and there's truly no user
   useEffect(() => {
@@ -57,33 +75,27 @@ export default function InvestmentPlanPage() {
     }
   }, [user, authLoading, router]);
 
-  const [formData, setFormData] = useState({
-    monthly_investment_amount: financialData.monthlyBudget,
-    risk_tolerance: financialData.riskTolerance,
-    financial_goal: financialData.financialGoal,
-    current_savings: financialData.currentSavings,
-    has_emergency_fund: financialData.hasEmergencyFund,
-    include_roth_ira: false,
-  });
+  const [formData, setFormData] = useState<InvestmentPlanFormData>(emptyFormData);
 
   const [plan, setPlan] = useState<PersonalizedPlanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Update form when context changes
-  useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      monthly_investment_amount: financialData.monthlyBudget,
-      current_savings: financialData.currentSavings,
-      has_emergency_fund: financialData.hasEmergencyFund,
-      risk_tolerance: financialData.riskTolerance,
-      financial_goal: financialData.financialGoal,
-    }));
-  }, [financialData]);
-
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+
+    const monthlyInvestmentAmount = Number(formData.monthly_investment_amount);
+    const currentSavings = Number(formData.current_savings);
+    if (
+      !monthlyInvestmentAmount ||
+      currentSavings < 0 ||
+      !formData.risk_tolerance ||
+      !formData.financial_goal
+    ) {
+      setError('Please complete the investment amount, savings, risk tolerance, and goal before generating a plan.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -91,6 +103,8 @@ export default function InvestmentPlanPage() {
       const API_BASE_URL = getApiBaseUrl();
       const payload = {
         ...formData,
+        monthly_investment_amount: monthlyInvestmentAmount,
+        current_savings: currentSavings,
         time_horizon_years: 10,
         monthly_gross_income: null,
         monthly_expenses: null,
@@ -122,11 +136,11 @@ export default function InvestmentPlanPage() {
 
       // Sync form data back to context
       updateFinancialData({
-        monthlyBudget: formData.monthly_investment_amount,
-        currentSavings: formData.current_savings,
+        monthlyBudget: monthlyInvestmentAmount,
+        currentSavings,
         hasEmergencyFund: formData.has_emergency_fund,
-        riskTolerance: formData.risk_tolerance as any,
-        financialGoal: formData.financial_goal as any,
+        riskTolerance: formData.risk_tolerance,
+        financialGoal: formData.financial_goal,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -257,7 +271,9 @@ export default function InvestmentPlanPage() {
                   value={formData.risk_tolerance}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                  required
                 >
+                  <option value="" disabled>Select risk tolerance</option>
                   <option value="conservative">Conservative</option>
                   <option value="moderate">Moderate</option>
                   <option value="aggressive">Aggressive</option>
@@ -270,7 +286,9 @@ export default function InvestmentPlanPage() {
                   value={formData.financial_goal}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                  required
                 >
+                  <option value="" disabled>Select primary goal</option>
                   <option value="wealth_building">Wealth Building</option>
                   <option value="income_generation">Income Generation</option>
                   <option value="capital_preservation">Capital Preservation</option>
