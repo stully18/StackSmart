@@ -232,11 +232,14 @@ security invoker
 set search_path = public
 as $$
 declare
-  v_event_id uuid;
+  v_event_id uuid := gen_random_uuid();
 begin
-  insert into public.app_events (user_id, event_type, metadata)
-  values ((select auth.uid()), p_event_type, coalesce(p_metadata, '{}'::jsonb))
-  returning id into v_event_id;
+  -- Do not use INSERT ... RETURNING here. Client roles intentionally have
+  -- INSERT but not SELECT on app_events, and RETURNING requires SELECT
+  -- privilege on returned columns. Generate the id first and return the local
+  -- variable so event logging works with insert-only table privileges.
+  insert into public.app_events (id, user_id, event_type, metadata)
+  values (v_event_id, (select auth.uid()), p_event_type, coalesce(p_metadata, '{}'::jsonb));
 
   return v_event_id;
 end;
