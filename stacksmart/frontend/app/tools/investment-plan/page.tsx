@@ -69,15 +69,6 @@ export default function InvestmentPlanPage() {
   const [plan, setPlan] = useState<PersonalizedPlanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoGenerate, setAutoGenerate] = useState(true);
-
-  // Auto-generate plan on first load if coming from dashboard with data
-  useEffect(() => {
-    if (autoGenerate && financialData.monthlyBudget > 0) {
-      setAutoGenerate(false);
-      handleSubmit();
-    }
-  }, []);
 
   // Update form when context changes
   useEffect(() => {
