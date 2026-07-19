@@ -34,13 +34,19 @@ describe('InvestmentPlanPage auto-generation behavior', () => {
     expect(source).not.toContain('...prev,\n      monthly_investment_amount: financialData.monthlyBudget');
   });
 
-  it('sends authenticated ai planning inputs and shows daily limit copy', () => {
+  it('sends authenticated ai planning inputs without Gemini or routine quota copy', () => {
     expect(source).toContain('fetchPlanGenerationStatus');
     expect(source).toContain('generatePersonalizedPlan');
     expect(source).toContain('session?.access_token');
     expect(source).toContain('loans.map');
-    expect(source).toContain('generations per day');
+    // AI Advisor wording is present; Gemini and routine quota/marketing copy are absent.
+    expect(source).toContain('AI Advisor');
+    expect(source).not.toContain('Gemini');
+    expect(source).not.toContain('generations per day');
+    expect(source).not.toContain('generations remaining today');
+    // Daily limit still blocks via the used-today banner/disabled button.
     expect(source).toContain('Daily AI Limit Reached');
+    expect(source).toContain('used_today');
   });
 
   it('renders the AI advisor dashboard above the ETF allocation sections', () => {
@@ -59,7 +65,16 @@ describe('InvestmentPlanPage auto-generation behavior', () => {
     expect(source).toContain('Emergency Fund');
     expect(source).toContain('Optional Satellite Stock Ideas');
     expect(source).toContain('Keep diversified ETFs as the core');
-    expect(source).toContain('Plan Confidence &amp; Assumptions');
+    // Renamed, non-confidence assumptions heading.
+    expect(source).toContain('Plan Assumptions');
+    // Confidence scoring is no longer rendered anywhere.
+    expect(source).not.toContain('Plan Confidence');
+    expect(source).not.toContain('confidence');
+    expect(source).not.toContain('confidenceTone');
+    // The separate "Optional AI Context" section header is gone; fields merged into the form.
+    expect(source).not.toContain('Optional AI Context');
+    // New notes placeholder wording, no Gemini.
+    expect(source).toContain('Any future goals or anything the AI Advisor should know?');
     expect(source).toContain('Data Used');
     expect(source).toContain('Missing Data');
     expect(source).toContain('Caveats');

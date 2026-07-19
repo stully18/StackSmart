@@ -287,18 +287,10 @@ export default function InvestmentPlanPage() {
           />
         </div>
 
-        <p className="text-sm text-text-muted mt-3">
-          AI plans are limited to {generationStatus?.limit ?? 10} generations per day per account. StackSmart includes your saved loans and the factors below, then asks Gemini Flash for a structured educational plan.
-        </p>
         {generationStatus?.used_today && (
           <div className="mt-4 bg-surface border border-warning/50 rounded-lg p-4 text-warning">
             You used all {generationStatus.limit} AI plans today. Come back tomorrow to generate more.
           </div>
-        )}
-        {generationStatus && !generationStatus.used_today && (
-          <p className="text-xs text-text-muted mt-3">
-            {generationStatus.remaining ?? Math.max(generationStatus.limit - (generationStatus.used_count ?? 0), 0)} AI plan generations remaining today.
-          </p>
         )}
 
         {/* Input Form */}
@@ -416,7 +408,7 @@ export default function InvestmentPlanPage() {
 
           <div className="border-t border-border-subtle" />
           <div>
-            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Optional AI Context</h3>
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Advisor Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <input type="number" name="monthly_gross_income" value={formData.monthly_gross_income} onChange={handleChange} min="0" step="1" placeholder="Monthly gross income" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
               <input type="number" name="monthly_expenses" value={formData.monthly_expenses} onChange={handleChange} min="0" step="1" placeholder="Monthly expenses" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
@@ -429,13 +421,13 @@ export default function InvestmentPlanPage() {
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   maxLength={1000}
-                  placeholder="Anything else Gemini should consider? Example: buying a home, variable income, upcoming tuition."
+                  placeholder="Any future goals or anything the AI Advisor should know?"
                   className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70 min-h-24"
                 />
               </div>
             </div>
             <p className="text-xs text-text-muted/70 mt-3">
-              Saved loans loaded: {loans.length}. Update loans in Debt Optimizer before generating if this looks wrong.
+              {loans.length} saved loan{loans.length === 1 ? '' : 's'} included from Debt Optimizer.
             </p>
           </div>
 
@@ -464,12 +456,6 @@ export default function InvestmentPlanPage() {
               const isRuleBased = plan.plan_source === 'rule_based';
               const showDashboard = Boolean(plan.advisor_summary || cards.length > 0);
               if (!showDashboard) return null;
-
-              const confidenceTone: Record<string, string> = {
-                high: 'text-success border-success/40',
-                medium: 'text-primary border-primary/40',
-                low: 'text-warning border-warning/40',
-              };
 
               return (
                 <div className="space-y-6">
@@ -501,11 +487,6 @@ export default function InvestmentPlanPage() {
                                 <h4 className="font-semibold text-lg text-text-primary">{card.title}</h4>
                                 <p className="text-xs uppercase tracking-widest text-text-muted">{card.category.replace('_', ' ')}</p>
                               </div>
-                              {card.confidence && (
-                                <span className={`text-xs px-2 py-1 rounded border ${confidenceTone[card.confidence] ?? 'text-text-secondary border-border'}`}>
-                                  {card.confidence} confidence
-                                </span>
-                              )}
                             </div>
                             <p className="text-sm text-text-secondary mb-2">{card.recommendation}</p>
                             <p className="text-xs text-text-muted mb-3">{card.rationale}</p>
@@ -600,13 +581,13 @@ export default function InvestmentPlanPage() {
                     </div>
                   )}
 
-                  {/* Plan Confidence & Assumptions */}
+                  {/* Plan Assumptions */}
                   {plan.advisor_assumptions && (() => {
                     const a = plan.advisor_assumptions!;
                     return (
                       <div className="bg-surface border border-border-subtle rounded-xl p-6">
                         <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">
-                          Plan Confidence &amp; Assumptions
+                          Plan Assumptions
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
@@ -641,7 +622,7 @@ export default function InvestmentPlanPage() {
                           </div>
                           <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
                             <div className="text-sm text-text-muted mb-2">
-                              Caveats {a.confidence && <span className="text-text-secondary">({a.confidence} confidence)</span>}
+                              Caveats
                             </div>
                             {a.caveats.length > 0 ? (
                               <ul className="space-y-1">
