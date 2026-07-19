@@ -80,19 +80,19 @@ def generate_ai_financial_plan(request: PersonalizedPlanRequest) -> Personalized
 
     client = genai.Client(api_key=api_key)
     payload = _request_payload(request, baseline)
+    schema = PersonalizedPlanResult.model_json_schema()
     prompt = (
         f"{SYSTEM_INSTRUCTIONS}\n\n"
         "Create a custom financial plan for this user. Return JSON only.\n\n"
+        f"OUTPUT_JSON_SCHEMA:\n{json.dumps(schema, separators=(',', ':'))}\n\n"
         f"INPUT_JSON:\n{json.dumps(payload, separators=(',', ':'))}"
     )
 
-    schema = PersonalizedPlanResult.model_json_schema()
     response = client.models.generate_content(
         model=DEFAULT_GEMINI_MODEL,
         contents=prompt,
         config=genai.types.GenerateContentConfig(
             response_mime_type="application/json",
-            response_schema=schema,
             system_instruction=SYSTEM_INSTRUCTIONS,
         ),
     )

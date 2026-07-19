@@ -1,9 +1,40 @@
-import asyncio
 import os
 
-from app.models.schemas import FinancialGoal, PersonalizedPlanRequest, RiskTolerance
+from app.models.schemas import ETFAllocation, FinancialGoal, PersonalizedPlanRequest, PersonalizedPlanResult, RiskTolerance
 from app.services import ai_financial_planner
 from app.services.ai_financial_planner import generate_ai_financial_plan
+
+
+def _sample_plan() -> PersonalizedPlanResult:
+    return PersonalizedPlanResult(
+        portfolio_name="Mock Portfolio",
+        risk_profile="moderate",
+        target_allocation=[
+            ETFAllocation(
+                ticker="VOO",
+                name="Vanguard S&P 500 ETF",
+                category="US Stocks",
+                percentage=100,
+                monthly_amount=500,
+                current_price=500,
+                expense_ratio=0.03,
+                description="Broad US equity exposure",
+                risk_level="medium",
+            )
+        ],
+        monthly_investment_breakdown={"VOO": 500},
+        projected_value_1yr=6200,
+        projected_value_5yr=35000,
+        projected_value_10yr=85000,
+        projected_value_20yr=280000,
+        projected_value_30yr=700000,
+        expected_annual_return=8.0,
+        portfolio_expense_ratio=0.03,
+        rebalancing_frequency="Annual",
+        reasoning=["Uses a diversified low-cost fund."],
+        next_steps=["Review before acting."],
+        warnings=["Educational guidance only."],
+    )
 
 
 def test_generate_ai_financial_plan_falls_back_when_disabled(monkeypatch):
@@ -63,3 +94,41 @@ def test_generate_ai_financial_plan_raises_without_key_when_enabled(monkeypatch)
         assert False, "expected RuntimeError for missing GEMINI_API_KEY"
     except RuntimeError as exc:
         assert "GEMINI_API_KEY" in str(exc)
+
+
+def test_generate_ai_financial_plan_uses_json_mode_without_developer_api_schema(monkeypatch):
+    """Gemini Developer API rejects Pydantic dict schemas because they emit
+    additionalProperties. Keep JSON mode, put the schema in the prompt, and
+    do not send response_schema in GenerateContentConfig."""
+    baseline = _sample_plan()
+    captured = {}
+
+    class FakeModels:
+        def generate_content(self, *, model, contents, config):
+            captured["model"] = model
+            captured["contents"] = contents
+            captured["config"] = config
+
+            class FakeResponse:
+                text = baseline.model_dump_json()
+
+            return FakeResponse()
+
+    class FakeClient:
+        def __init__(self, *, api_key):
+            captured["api_key"] = api_key
+            self.models = FakeModels()
+
+    monkeypatch.setenv("ENABLE_GEMINI_FINANCIAL_PLANS", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: baseline)
+    monkeypatch.setattr(ai_financial_planner.genai, "Client", FakeClient)
+
+    plan = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+
+    assert plan.portfolio_name == "Mock Portfolio"
+    assert captured["api_key"] == "test-key"
+    assert "OUTPUT_JSON_SCHEMA" in captured["contents"]
+    assert "INPUT_JSON" in captured["contents"]
+    assert getattr(captured["config"], "response_mime_type") == "application/json"
+    assert getattr(captured["config"], "response_schema", None) is None
