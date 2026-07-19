@@ -153,3 +153,58 @@ export interface MultiLoanResult {
   reasoning: string[];
   confidence_score: number;
 }
+
+// ============= AI Advisor Dashboard Types =============
+// Mirror the richer advisor-dashboard payload that the backend can return
+// (Gemini-backed or rule-based fallback). The page renders these sections
+// above the existing ETF allocation / projection sections.
+
+export type AdvisorCardCategory =
+  | 'investing'
+  | 'etf_allocation'
+  | 'satellite_stock'
+  | 'debt'
+  | 'emergency_fund'
+  | 'cashflow'
+  | 'goal'
+  | 'assumptions'
+  | string;
+
+export type AdvisorConfidence = 'high' | 'medium' | 'low' | string;
+
+export type PlanSource = 'ai' | 'rule_based' | string;
+
+export interface AdvisorCard {
+  title: string;
+  priority: number; // 1..8
+  category: AdvisorCardCategory;
+  recommendation: string;
+  rationale: string;
+  action_items: string[];
+  monthly_amount?: number | null;
+  confidence?: AdvisorConfidence | null;
+}
+
+export interface MonthlyActionPlan {
+  available_monthly_amount?: number | null;
+  etf_investing_amount?: number | null;
+  debt_extra_payment_amount?: number | null;
+  emergency_fund_amount?: number | null;
+  notes: string[];
+}
+
+export interface SatelliteStockIdea {
+  ticker: string;
+  name: string;
+  allocation_percent: number; // 0..10
+  monthly_amount: number;
+  reason: string;
+  risk_note: string;
+}
+
+export interface AdvisorAssumptions {
+  confidence: AdvisorConfidence;
+  data_used: string[];
+  missing_data: string[];
+  caveats: string[];
+}

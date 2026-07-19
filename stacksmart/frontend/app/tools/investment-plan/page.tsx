@@ -11,7 +11,15 @@ import BetaNotice from '@/app/components/BetaNotice';
 import FeedbackPanel from '@/app/components/FeedbackPanel';
 import { fetchPlanGenerationStatus, generatePersonalizedPlan } from '@/lib/api';
 import { loadUserLoans, logAppEvent } from '@/lib/loans';
-import type { Loan, PersonalizedPlanGenerationStatus } from '@/types';
+import type {
+  Loan,
+  PersonalizedPlanGenerationStatus,
+  AdvisorCard,
+  MonthlyActionPlan,
+  SatelliteStockIdea,
+  AdvisorAssumptions,
+  PlanSource,
+} from '@/types';
 
 interface ETFAllocation {
   ticker: string;
@@ -44,6 +52,12 @@ interface PersonalizedPlanResult {
   next_steps: string[];
   warnings: string[] | null;
   months_to_emergency_fund: number | null;
+  advisor_summary?: string | null;
+  advisor_cards?: AdvisorCard[];
+  monthly_action_plan?: MonthlyActionPlan | null;
+  satellite_stock_ideas?: SatelliteStockIdea[];
+  advisor_assumptions?: AdvisorAssumptions | null;
+  plan_source?: PlanSource;
 }
 
 interface InvestmentPlanFormData {
@@ -75,6 +89,19 @@ const emptyFormData: InvestmentPlanFormData = {
   age: '',
   notes: '',
 };
+
+// Sort advisor cards by priority ascending and keep 6-8 for the dashboard.
+function prioritizedAdvisorCards(cards: AdvisorCard[] | undefined): AdvisorCard[] {
+  if (!cards || cards.length === 0) return [];
+  const sorted = [...cards].sort((a, b) => a.priority - b.priority);
+  // Show a denser 6-8 card dashboard when more are available.
+  return sorted.length > 8 ? sorted.slice(0, 8) : sorted;
+}
+
+function formatUsd(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) return '—';
+  return `$${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
 
 export default function InvestmentPlanPage() {
   const router = useRouter();
@@ -431,6 +458,212 @@ export default function InvestmentPlanPage() {
         {/* Results Display */}
         {plan && (
           <div className="space-y-6">
+            {/* AI Advisor Dashboard (top-level, before ETF allocation) */}
+            {(() => {
+              const cards = prioritizedAdvisorCards(plan.advisor_cards);
+              const isRuleBased = plan.plan_source === 'rule_based';
+              const showDashboard = Boolean(plan.advisor_summary || cards.length > 0);
+              if (!showDashboard) return null;
+
+              const confidenceTone: Record<string, string> = {
+                high: 'text-success border-success/40',
+                medium: 'text-primary border-primary/40',
+                low: 'text-warning border-warning/40',
+              };
+
+              return (
+                <div className="space-y-6">
+                  {isRuleBased && (
+                    <div className="bg-surface border-l-4 border-warning border-t border-r border-b border-t-border-subtle border-r-border-subtle border-b-border-subtle rounded-lg p-4">
+                      <h3 className="text-base font-semibold mb-1 text-warning">Rule-based fallback</h3>
+                      <p className="text-sm text-text-secondary">
+                        AI plan generation is unavailable, so StackSmart built this advisor dashboard from your
+                        inputs using a deterministic rule-based fallback. It is educational guidance, not professional advice.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="bg-surface border border-primary/30 rounded-xl p-6">
+                    <h2 className="text-2xl font-semibold tracking-tight text-text-primary mb-2">Your AI Advisor Plan</h2>
+                    {plan.advisor_summary && (
+                      <p className="text-text-muted mb-4">{plan.advisor_summary}</p>
+                    )}
+
+                    {cards.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {cards.map((card) => (
+                          <div
+                            key={`${card.category}-${card.priority}`}
+                            className="bg-surface-elevated/30 border border-border-subtle rounded-xl p-4 hover:border-border transition-colors"
+                          >
+                            <div className="flex justify-between items-start gap-3 mb-2">
+                              <div>
+                                <h4 className="font-semibold text-lg text-text-primary">{card.title}</h4>
+                                <p className="text-xs uppercase tracking-widest text-text-muted">{card.category.replace('_', ' ')}</p>
+                              </div>
+                              {card.confidence && (
+                                <span className={`text-xs px-2 py-1 rounded border ${confidenceTone[card.confidence] ?? 'text-text-secondary border-border'}`}>
+                                  {card.confidence} confidence
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-text-secondary mb-2">{card.recommendation}</p>
+                            <p className="text-xs text-text-muted mb-3">{card.rationale}</p>
+                            {card.action_items && card.action_items.length > 0 && (
+                              <ul className="space-y-1 mb-3">
+                                {card.action_items.map((item, idx) => (
+                                  <li key={idx} className="text-sm text-text-secondary flex items-start gap-2">
+                                    <Check size={14} className="text-primary mt-0.5" />
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {card.monthly_amount !== null && card.monthly_amount !== undefined && (
+                              <div className="text-sm">
+                                <span className="text-text-muted">Monthly: </span>
+                                <span className="text-success font-semibold">{formatUsd(card.monthly_amount)}/mo</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Monthly Action Plan */}
+                  {plan.monthly_action_plan && (() => {
+                    const map = plan.monthly_action_plan;
+                    return (
+                      <div className="bg-surface border border-border-subtle rounded-xl p-6">
+                        <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">Monthly Action Plan</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted">Available Monthly</div>
+                            <div className="text-2xl font-semibold text-text-primary">{formatUsd(map.available_monthly_amount)}</div>
+                          </div>
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted">ETF Investing</div>
+                            <div className="text-2xl font-semibold text-success">{formatUsd(map.etf_investing_amount)}</div>
+                          </div>
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted">Extra Debt Payoff</div>
+                            <div className="text-2xl font-semibold text-primary">{formatUsd(map.debt_extra_payment_amount)}</div>
+                          </div>
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted">Emergency Fund</div>
+                            <div className="text-2xl font-semibold text-text-primary">{formatUsd(map.emergency_fund_amount)}</div>
+                          </div>
+                        </div>
+                        {map.notes && map.notes.length > 0 && (
+                          <ul className="mt-4 space-y-1">
+                            {map.notes.map((note, idx) => (
+                              <li key={idx} className="text-xs text-text-muted flex items-start gap-2">
+                                <AlertTriangle size={12} className="text-warning mt-0.5" />
+                                {note}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Optional Satellite Stock Ideas */}
+                  {plan.satellite_stock_ideas && plan.satellite_stock_ideas.length > 0 && (
+                    <div className="bg-surface border border-border-subtle rounded-xl p-6">
+                      <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-1">Optional Satellite Stock Ideas</h3>
+                      <p className="text-sm text-text-muted mb-4">
+                        Keep diversified ETFs as the core. These individual stocks are small, optional satellite picks only.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {plan.satellite_stock_ideas.map((idea) => (
+                          <div
+                            key={idea.ticker}
+                            className="bg-surface-elevated/30 border border-warning/30 rounded-xl p-4"
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h4 className="font-semibold text-lg text-text-primary">{idea.ticker}</h4>
+                                <p className="text-sm text-text-muted">{idea.name}</p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-semibold text-text-primary">{idea.allocation_percent}%</div>
+                                <div className="text-sm text-text-muted">{formatUsd(idea.monthly_amount)}/mo</div>
+                              </div>
+                            </div>
+                            <p className="text-sm text-text-secondary mb-2">{idea.reason}</p>
+                            <p className="text-xs text-warning">Risk: {idea.risk_note}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Plan Confidence & Assumptions */}
+                  {plan.advisor_assumptions && (() => {
+                    const a = plan.advisor_assumptions!;
+                    return (
+                      <div className="bg-surface border border-border-subtle rounded-xl p-6">
+                        <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">
+                          Plan Confidence &amp; Assumptions
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted mb-2">Data Used</div>
+                            {a.data_used.length > 0 ? (
+                              <ul className="space-y-1">
+                                {a.data_used.map((item, idx) => (
+                                  <li key={idx} className="text-sm text-text-secondary flex items-start gap-2">
+                                    <Check size={14} className="text-success mt-0.5" />
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-text-muted">No supplementary data provided.</p>
+                            )}
+                          </div>
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted mb-2">Missing Data</div>
+                            {a.missing_data.length > 0 ? (
+                              <ul className="space-y-1">
+                                {a.missing_data.map((item, idx) => (
+                                  <li key={idx} className="text-sm text-text-secondary flex items-start gap-2">
+                                    <AlertTriangle size={14} className="text-warning mt-0.5" />
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-text-muted">No notable gaps.</p>
+                            )}
+                          </div>
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted mb-2">
+                              Caveats {a.confidence && <span className="text-text-secondary">({a.confidence} confidence)</span>}
+                            </div>
+                            {a.caveats.length > 0 ? (
+                              <ul className="space-y-1">
+                                {a.caveats.map((item, idx) => (
+                                  <li key={idx} className="text-sm text-text-secondary flex items-start gap-2">
+                                    <AlertTriangle size={14} className="text-warning mt-0.5" />
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-text-muted">No caveats noted.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })()}
+
             {/* Portfolio Overview */}
             <div className="bg-surface border border-border-subtle rounded-xl p-6">
               <h2 className="text-2xl font-semibold tracking-tight text-text-primary mb-2">{plan.portfolio_name}</h2>
@@ -468,7 +701,10 @@ export default function InvestmentPlanPage() {
 
             {/* ETF Allocations */}
             <div className="bg-surface border border-border-subtle rounded-xl p-6">
-              <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">Your Portfolio Allocation</h3>
+              <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-1">Core ETF Allocation Details</h3>
+              <p className="text-sm text-text-muted mb-4">
+                This is the investable core behind the advisor recommendations above.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {plan.target_allocation.map((etf) => (
                   <div key={etf.ticker} className="bg-surface-elevated/30 border border-border-subtle rounded-xl p-4 hover:border-border transition-colors">
@@ -554,7 +790,7 @@ export default function InvestmentPlanPage() {
 
             {/* Reasoning */}
             <div className="bg-surface border border-border-subtle rounded-xl p-6">
-              <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">Why This Portfolio?</h3>
+              <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">Why This Advisor Plan?</h3>
               <ul className="space-y-3">
                 {plan.reasoning.map((reason, idx) => (
                   <li key={idx} className="flex items-start gap-3">

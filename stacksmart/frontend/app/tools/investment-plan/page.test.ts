@@ -42,4 +42,34 @@ describe('InvestmentPlanPage auto-generation behavior', () => {
     expect(source).toContain('generations per day');
     expect(source).toContain('Daily AI Limit Reached');
   });
+
+  it('renders the AI advisor dashboard above the ETF allocation sections', () => {
+    // Top-level advisor dashboard header.
+    expect(source).toContain('Your AI Advisor Plan');
+    // Fallback banner copy when plan_source === 'rule_based'.
+    expect(source).toContain("plan.plan_source === 'rule_based'");
+    expect(source).toContain('Rule-based fallback');
+    // Advisor cards, sorted/sliced 6-8.
+    expect(source).toContain('prioritizedAdvisorCards');
+    expect(source).toContain('advisor_cards');
+    // Conditional sections.
+    expect(source).toContain('Monthly Action Plan');
+    expect(source).toContain('ETF Investing');
+    expect(source).toContain('Extra Debt Payoff');
+    expect(source).toContain('Emergency Fund');
+    expect(source).toContain('Optional Satellite Stock Ideas');
+    expect(source).toContain('Keep diversified ETFs as the core');
+    expect(source).toContain('Plan Confidence &amp; Assumptions');
+    expect(source).toContain('Data Used');
+    expect(source).toContain('Missing Data');
+    expect(source).toContain('Caveats');
+  });
+
+  it('uses the renamed ETF + reasoning headings', () => {
+    expect(source).toContain('Core ETF Allocation Details');
+    expect(source).toContain('investable core behind the advisor recommendations');
+    expect(source).toContain('Why This Advisor Plan?');
+    expect(source).not.toContain('Why This Portfolio?');
+    expect(source).not.toContain('Your Portfolio Allocation');
+  });
 });

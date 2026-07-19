@@ -136,6 +136,44 @@ class PersonalizedPlanRequest(BaseModel):
     tax_filing_status: Optional[str] = Field(default=None, max_length=64, description="Optional tax filing status")
     notes: Optional[str] = Field(default=None, max_length=1000, description="Optional user-provided planning context")
 
+class AdvisorCard(BaseModel):
+    title: str
+    priority: int = Field(..., ge=1, le=8)
+    category: str = Field(..., description="investing | etf_allocation | satellite_stock | debt | emergency_fund | cashflow | goal | assumptions")
+    recommendation: str
+    rationale: str
+    action_items: List[str] = Field(default_factory=list)
+    monthly_amount: Optional[float] = None
+    confidence: Optional[str] = Field(default=None, description="high | medium | low")
+
+
+class MonthlyActionPlan(BaseModel):
+    available_monthly_amount: Optional[float] = None
+    etf_investing_amount: Optional[float] = None
+    debt_extra_payment_amount: Optional[float] = None
+    emergency_fund_amount: Optional[float] = None
+    notes: List[str] = Field(default_factory=list)
+
+
+class SatelliteStockIdea(BaseModel):
+    ticker: str
+    name: str
+    # Note: no upper bound here on purpose. Gemini may return >10; the
+    # sanitizer clamps each idea down to <=10% so over-allocated output
+    # never fails validation before it can be corrected.
+    allocation_percent: float = Field(..., ge=0)
+    monthly_amount: float = Field(..., ge=0)
+    reason: str
+    risk_note: str
+
+
+class AdvisorAssumptions(BaseModel):
+    confidence: str = Field(..., description="high | medium | low")
+    data_used: List[str] = Field(default_factory=list)
+    missing_data: List[str] = Field(default_factory=list)
+    caveats: List[str] = Field(default_factory=list)
+
+
 class PersonalizedPlanResult(BaseModel):
     portfolio_name: str
     risk_profile: str
@@ -154,3 +192,9 @@ class PersonalizedPlanResult(BaseModel):
     warnings: Optional[List[str]] = None
     paycheck_breakdown: Optional[dict] = None
     months_to_emergency_fund: Optional[int] = None
+    advisor_summary: Optional[str] = None
+    advisor_cards: List[AdvisorCard] = Field(default_factory=list)
+    monthly_action_plan: Optional[MonthlyActionPlan] = None
+    satellite_stock_ideas: List[SatelliteStockIdea] = Field(default_factory=list)
+    advisor_assumptions: Optional[AdvisorAssumptions] = None
+    plan_source: str = Field(default="rule_based", description="ai | rule_based")
