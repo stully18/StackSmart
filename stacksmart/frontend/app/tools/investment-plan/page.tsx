@@ -9,8 +9,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useFinancialData } from '../../context/FinancialContext';
 import BetaNotice from '@/app/components/BetaNotice';
 import FeedbackPanel from '@/app/components/FeedbackPanel';
-import { getApiBaseUrl, getApiErrorMessage } from '@/lib/api';
-import { logAppEvent } from '@/lib/loans';
+import { fetchPlanGenerationStatus, generatePersonalizedPlan } from '@/lib/api';
+import { loadUserLoans, logAppEvent } from '@/lib/loans';
+import type { Loan, PersonalizedPlanGenerationStatus } from '@/types';
 
 interface ETFAllocation {
   ticker: string;
@@ -52,6 +53,12 @@ interface InvestmentPlanFormData {
   current_savings: number | '';
   has_emergency_fund: boolean;
   include_roth_ira: boolean;
+  monthly_gross_income: number | '';
+  monthly_expenses: number | '';
+  current_emergency_fund: number | '';
+  emergency_fund_months_target: number | '';
+  age: number | '';
+  notes: string;
 }
 
 const emptyFormData: InvestmentPlanFormData = {
@@ -61,11 +68,17 @@ const emptyFormData: InvestmentPlanFormData = {
   current_savings: '',
   has_emergency_fund: false,
   include_roth_ira: false,
+  monthly_gross_income: '',
+  monthly_expenses: '',
+  current_emergency_fund: '',
+  emergency_fund_months_target: 3,
+  age: '',
+  notes: '',
 };
 
 export default function InvestmentPlanPage() {
   const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, session, isLoading: authLoading } = useAuth();
   const { updateFinancialData } = useFinancialData();
 
   // Redirect to login only AFTER auth finishes loading and there's truly no user
@@ -75,11 +88,46 @@ export default function InvestmentPlanPage() {
     }
   }, [user, authLoading, router]);
 
+  useEffect(() => {
+    if (!user || !session?.access_token) return;
+
+    let isMounted = true;
+
+    const loadAiInputs = async () => {
+      setStatusLoading(true);
+      try {
+        const [savedLoans, status] = await Promise.all([
+          loadUserLoans(),
+          fetchPlanGenerationStatus(session.access_token),
+        ]);
+        if (isMounted) {
+          setLoans(savedLoans);
+          setGenerationStatus(status);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Unable to load AI planning inputs.');
+        }
+      } finally {
+        if (isMounted) setStatusLoading(false);
+      }
+    };
+
+    loadAiInputs();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, session?.access_token]);
+
   const [formData, setFormData] = useState<InvestmentPlanFormData>(emptyFormData);
 
   const [plan, setPlan] = useState<PersonalizedPlanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [generationStatus, setGenerationStatus] = useState<PersonalizedPlanGenerationStatus | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -99,31 +147,43 @@ export default function InvestmentPlanPage() {
     setLoading(true);
     setError(null);
 
+    if (!session?.access_token) {
+      setError('Please sign in again before generating an AI plan.');
+      setLoading(false);
+      return;
+    }
+
+    if (generationStatus?.used_today) {
+      setError('You already generated your AI plan today. Please come back tomorrow.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const API_BASE_URL = getApiBaseUrl();
       const payload = {
         ...formData,
         monthly_investment_amount: monthlyInvestmentAmount,
         current_savings: currentSavings,
         time_horizon_years: 10,
-        monthly_gross_income: null,
-        monthly_expenses: null,
-        employer_401k_match_percent: null,
+        monthly_gross_income: formData.monthly_gross_income === '' ? null : Number(formData.monthly_gross_income),
+        monthly_expenses: formData.monthly_expenses === '' ? null : Number(formData.monthly_expenses),
+        current_emergency_fund: formData.current_emergency_fund === '' ? 0 : Number(formData.current_emergency_fund),
+        emergency_fund_months_target: formData.emergency_fund_months_target === '' ? 3 : Number(formData.emergency_fund_months_target),
+        age: formData.age === '' ? null : Number(formData.age),
+        notes: formData.notes.trim() || null,
+        loans: loans.map(({ id, ...loan }) => ({
+          ...loan,
+          interest_rate: loan.interest_rate / 100,
+        })),
       };
-      const response = await fetch(`${API_BASE_URL}/api/plan/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
+      const data = await generatePersonalizedPlan(payload, session.access_token);
 
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'Unable to generate a plan from those inputs. Please adjust the numbers and try again.'));
-      }
-
-      const data = await response.json();
       setPlan(data);
+      setGenerationStatus({
+        limit: 1,
+        used_today: true,
+        generation: null,
+      });
 
       // Best-effort event log; never block on it or surface its failure.
       try {
@@ -197,6 +257,15 @@ export default function InvestmentPlanPage() {
             message="This tool uses simplified assumptions and broad ETF examples. Confirm fund choices, tax treatment, and account type before placing trades."
           />
         </div>
+
+        <p className="text-sm text-text-muted mt-3">
+          AI plans are limited to one generation per day per account. StackSmart includes your saved loans and the factors below, then asks Gemini Flash for a structured educational plan.
+        </p>
+        {generationStatus?.used_today && (
+          <div className="mt-4 bg-surface border border-warning/50 rounded-lg p-4 text-warning">
+            You already generated today's AI plan. Come back tomorrow to generate a new one.
+          </div>
+        )}
 
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="bg-surface border border-border-subtle rounded-xl p-6 mb-8 space-y-8">
@@ -311,12 +380,37 @@ export default function InvestmentPlanPage() {
             </div>
           </div>
 
+          <div className="border-t border-border-subtle" />
+          <div>
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Optional AI Context</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <input type="number" name="monthly_gross_income" value={formData.monthly_gross_income} onChange={handleChange} min="0" step="1" placeholder="Monthly gross income" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
+              <input type="number" name="monthly_expenses" value={formData.monthly_expenses} onChange={handleChange} min="0" step="1" placeholder="Monthly expenses" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
+              <input type="number" name="current_emergency_fund" value={formData.current_emergency_fund} onChange={handleChange} min="0" step="1" placeholder="Emergency fund saved" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
+              <input type="number" name="emergency_fund_months_target" value={formData.emergency_fund_months_target} onChange={handleChange} min="1" max="12" step="1" placeholder="Emergency fund months target" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
+              <input type="number" name="age" value={formData.age} onChange={handleChange} min="13" max="100" step="1" placeholder="Age" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
+              <div className="md:col-span-3">
+                <textarea
+                  name="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  maxLength={1000}
+                  placeholder="Anything else Gemini should consider? Example: buying a home, variable income, upcoming tuition."
+                  className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70 min-h-24"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-text-muted/70 mt-3">
+              Saved loans loaded: {loans.length}. Update loans in Debt Optimizer before generating if this looks wrong.
+            </p>
+          </div>
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || statusLoading || generationStatus?.used_today}
             className="w-full px-6 py-3 btn-gradient rounded-lg font-semibold text-gray-900 disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none disabled:cursor-not-allowed"
           >
-            {loading ? 'Generating Plan...' : 'Generate My Investment Plan'}
+            {loading ? 'Generating AI Plan...' : generationStatus?.used_today ? 'AI Plan Used Today' : 'Generate My AI Plan'}
           </button>
         </form>
 

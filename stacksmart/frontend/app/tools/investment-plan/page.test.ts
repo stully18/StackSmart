@@ -33,4 +33,13 @@ describe('InvestmentPlanPage auto-generation behavior', () => {
     expect(source).not.toContain('financial_goal: financialData.financialGoal');
     expect(source).not.toContain('...prev,\n      monthly_investment_amount: financialData.monthlyBudget');
   });
+
+  it('sends authenticated ai planning inputs and shows daily limit copy', () => {
+    expect(source).toContain('fetchPlanGenerationStatus');
+    expect(source).toContain('generatePersonalizedPlan');
+    expect(source).toContain('session?.access_token');
+    expect(source).toContain('loans.map');
+    expect(source).toContain('one generation per day');
+    expect(source).toContain('AI Plan Used Today');
+  });
 });

@@ -9,6 +9,14 @@ from app.services import investment_planner
 from app.services import multi_loan_optimizer
 from app.middleware.auth import verify_user_token
 from app.services.user_service import save_financial_plan, get_user_plans, delete_plan
+from app.services import ai_financial_planner
+from app.services.ai_plan_limit import (
+    DailyPlanLimitExceeded,
+    complete_daily_generation,
+    get_today_generation,
+    release_failed_generation,
+    reserve_daily_generation,
+)
 
 app = FastAPI(
     title="StackSmart API",
@@ -585,39 +593,57 @@ from app.models.schemas import PersonalizedPlanRequest, PersonalizedPlanResult
 
 
 @app.post("/api/plan/generate", response_model=PersonalizedPlanResult)
-async def generate_financial_plan(request: PersonalizedPlanRequest):
+async def generate_financial_plan(
+    request: PersonalizedPlanRequest,
+    user_id: str = Depends(verify_user_token),
+):
     """
-    Generate a personalized investment plan based on user's profile.
+    Generate one AI-assisted personalized investment plan per user per UTC day.
 
-    Takes into account:
-    - Monthly investment amount
-    - Risk tolerance (conservative, moderate, aggressive)
-    - Financial goals (wealth building, income, preservation, debt freedom)
-    - Time horizon
-    - Current savings
-    - Emergency fund status
-
-    Returns:
-    - Customized ETF portfolio with real market data
-    - Expected returns and projections
-    - Monthly investment breakdown
-    - Actionable next steps
-    - Warnings if applicable
-
-    Uses REAL market data for ETF prices and performance.
+    Requires a Supabase bearer token. Enforces the daily generation limit
+    server-side via the ai_plan_generations table, reserves a slot before
+    calling Gemini, and releases it if generation fails so provider errors
+    do not consume the user's one daily attempt.
     """
+    model = ai_financial_planner.DEFAULT_GEMINI_MODEL
+    generation_id = None
     try:
-        print(f"[DEBUG] Generating personalized plan: {request.risk_tolerance.value} risk, {request.financial_goal.value} goal")
+        generation_id = await reserve_daily_generation(
+            user_id=user_id,
+            model=model,
+            request_payload=request.model_dump(mode="json"),
+        )
+        print(f"[DEBUG] Generating AI plan for user={user_id}, model={model}")
 
-        plan = personalized_planner.generate_personalized_plan(request)
+        plan = ai_financial_planner.generate_ai_financial_plan(request)
 
-        print(f"[DEBUG] Plan generated: {plan.portfolio_name}, {len(plan.target_allocation)} ETFs, {plan.expected_annual_return}% expected return")
+        await complete_daily_generation(generation_id, plan.model_dump(mode="json"))
         return plan
+    except DailyPlanLimitExceeded as e:
+        raise HTTPException(status_code=429, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"[ERROR] Plan generation failed: {str(e)}")
+        print(f"[ERROR] AI plan generation failed: {str(e)}")
+        if generation_id:
+            try:
+                await release_failed_generation(generation_id, str(e))
+            except Exception as release_error:
+                print(f"[WARN] Failed to release AI generation reservation: {release_error}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail="An internal error occurred.")
+        raise HTTPException(status_code=500, detail="AI plan generation is unavailable right now. Please try again later.")
+
+
+@app.get("/api/plan/generate/status")
+async def get_financial_plan_generation_status(user_id: str = Depends(verify_user_token)):
+    """Report whether the authenticated user has used today's AI plan generation."""
+    today = await get_today_generation(user_id)
+    return {
+        "limit": 1,
+        "used_today": today is not None and today.get("status") in {"pending", "completed"},
+        "generation": today,
+    }
 
 
 # ============= User-Scoped Data Endpoints =============

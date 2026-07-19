@@ -12,6 +12,10 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Required by lib/api.ts, which throws at import time if this is unset.
+    env: {
+      NEXT_PUBLIC_API_URL: 'https://api.example.test',
+    },
     include: ['**/*.test.ts', '**/*.test.tsx'],
   },
 });

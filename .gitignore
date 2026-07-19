@@ -7,3 +7,12 @@ AGENTS.md
 node_modules/
 temporary-screenshots/
 SECURITY_FIXES.md
+
+# Local environment files (may contain API keys/secrets)
+.env
+.env.*
+!.env.example
+
+# Local Python venv (created for backend TDD)
+.venv/
+venv/

@@ -6,5 +6,7 @@ python-dotenv>=1.0.0
 plaid-python>=17.0.0
 requests>=2.31.0
 yfinance==0.2.58
-supabase==2.6.0
-websockets>=11,<13
+supabase>=2.6.0
+websockets>=13,<17
+google-genai>=1.0.0
+pytest>=8.0.0
