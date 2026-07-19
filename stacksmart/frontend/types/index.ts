@@ -123,6 +123,8 @@ export interface DebtPriority {
 
 export interface PersonalizedPlanGenerationStatus {
   limit: number;
+  used_count?: number;
+  remaining?: number;
   used_today: boolean;
   generation: null | {
     id: string;

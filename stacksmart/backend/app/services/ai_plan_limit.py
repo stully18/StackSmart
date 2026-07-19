@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, cast
 from uuid import uuid4
 
 from postgrest.exceptions import APIError
@@ -9,8 +9,11 @@ from postgrest.exceptions import APIError
 from app.services.user_service import get_supabase_client
 
 
+DAILY_AI_PLAN_LIMIT = 10
+
+
 class DailyPlanLimitExceeded(Exception):
-    """Raised when a user already has a generation for the current UTC day."""
+    """Raised when a user has used every AI generation slot for the current UTC day."""
 
 
 def today_utc() -> str:
@@ -22,36 +25,80 @@ def today_utc() -> str:
     return datetime.now(timezone.utc).date().isoformat()
 
 
-async def reserve_daily_generation(user_id: str, model: str, request_payload: dict[str, Any]) -> str:
-    """Reserve today's one AI-generation slot with a unique DB insert.
+def _used_generation_numbers(rows: list[dict[str, Any]]) -> set[int]:
+    used = set()
+    for row in rows:
+        number = row.get("generation_number")
+        if isinstance(number, int):
+            used.add(number)
+    return used
 
-    Relies on the ai_plan_generations_user_day_unique (user_id, generated_on)
-    constraint to enforce the limit atomically. If a row already exists for the
-    user today, the insert fails and we raise DailyPlanLimitExceeded.
+
+def _limit_message() -> str:
+    return f"You already generated {DAILY_AI_PLAN_LIMIT} AI plans today. Please try again tomorrow."
+
+
+async def get_today_generations(user_id: str) -> list[dict[str, Any]]:
+    """Return today's pending/completed generation rows for the caller."""
+    supabase = get_supabase_client()
+    response = (
+        supabase.table("ai_plan_generations")
+        .select("id,generated_on,status,provider,model,generation_number,created_at,completed_at")
+        .eq("user_id", user_id)
+        .eq("generated_on", today_utc())
+        .in_("status", ["pending", "completed"])
+        .order("generation_number", desc=False)
+        .limit(DAILY_AI_PLAN_LIMIT)
+        .execute()
+    )
+    return cast(list[dict[str, Any]], response.data or [])
+
+
+async def reserve_daily_generation(user_id: str, model: str, request_payload: dict[str, Any]) -> str:
+    """Reserve one of today's AI-generation slots.
+
+    The ai_plan_generations_user_day_number_unique constraint keeps each
+    generation_number unique per user/day. We choose the first open slot from
+    1..DAILY_AI_PLAN_LIMIT; if all slots are occupied, the user is limited.
     """
     supabase = get_supabase_client()
-    generation_id = str(uuid4())
-    row = {
-        "id": generation_id,
-        "user_id": user_id,
-        "generated_on": today_utc(),
-        "status": "pending",
-        "provider": "gemini",
-        "model": model,
-        "request_payload": request_payload,
-    }
+    today_rows = await get_today_generations(user_id)
+    used_numbers = _used_generation_numbers(today_rows)
+    if len(used_numbers) >= DAILY_AI_PLAN_LIMIT:
+        raise DailyPlanLimitExceeded(_limit_message())
 
-    try:
-        supabase.table("ai_plan_generations").insert(row).execute()
-    except APIError as exc:
-        message = str(exc)
-        if "ai_plan_generations_user_day_unique" in message or "duplicate key" in message.lower():
-            raise DailyPlanLimitExceeded(
-                "You already generated an AI plan today. Please try again tomorrow."
-            ) from exc
-        raise
+    for generation_number in range(1, DAILY_AI_PLAN_LIMIT + 1):
+        if generation_number in used_numbers:
+            continue
 
-    return generation_id
+        generation_id = str(uuid4())
+        row = {
+            "id": generation_id,
+            "user_id": user_id,
+            "generated_on": today_utc(),
+            "generation_number": generation_number,
+            "status": "pending",
+            "provider": "gemini",
+            "model": model,
+            "request_payload": request_payload,
+        }
+
+        try:
+            supabase.table("ai_plan_generations").insert(row).execute()
+            return generation_id
+        except APIError as exc:
+            message = str(exc)
+            is_slot_race = (
+                "ai_plan_generations_user_day_number_unique" in message
+                or "duplicate key" in message.lower()
+            )
+            if not is_slot_race:
+                raise
+            # Another request took this slot after our read. Try the next slot;
+            # if every slot races/fills, surface the daily limit.
+            continue
+
+    raise DailyPlanLimitExceeded(_limit_message())
 
 
 async def complete_daily_generation(generation_id: str, response_payload: dict[str, Any]) -> None:
@@ -65,7 +112,7 @@ async def complete_daily_generation(generation_id: str, response_payload: dict[s
 
 
 async def release_failed_generation(generation_id: str, error_message: str) -> None:
-    """Mark and remove a failed reservation so provider errors don't consume the day."""
+    """Mark and remove a failed reservation so provider errors don't consume a slot."""
     supabase = get_supabase_client()
     supabase.table("ai_plan_generations").update({
         "status": "failed",
@@ -76,14 +123,6 @@ async def release_failed_generation(generation_id: str, error_message: str) -> N
 
 
 async def get_today_generation(user_id: str) -> Optional[dict[str, Any]]:
-    """Return the caller's generation row for the current UTC day, if any."""
-    supabase = get_supabase_client()
-    response = (
-        supabase.table("ai_plan_generations")
-        .select("id,generated_on,status,provider,model,created_at,completed_at")
-        .eq("user_id", user_id)
-        .eq("generated_on", today_utc())
-        .limit(1)
-        .execute()
-    )
-    return response.data[0] if response.data else None
+    """Return the caller's latest generation row for today, if any."""
+    rows = await get_today_generations(user_id)
+    return rows[-1] if rows else None

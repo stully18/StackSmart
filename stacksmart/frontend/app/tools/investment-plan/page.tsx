@@ -180,8 +180,10 @@ export default function InvestmentPlanPage() {
 
       setPlan(data);
       setGenerationStatus({
-        limit: 1,
-        used_today: true,
+        limit: generationStatus?.limit ?? 10,
+        used_count: Math.min((generationStatus?.used_count ?? 0) + 1, generationStatus?.limit ?? 10),
+        remaining: Math.max((generationStatus?.remaining ?? 10) - 1, 0),
+        used_today: ((generationStatus?.used_count ?? 0) + 1) >= (generationStatus?.limit ?? 10),
         generation: null,
       });
 
@@ -259,12 +261,17 @@ export default function InvestmentPlanPage() {
         </div>
 
         <p className="text-sm text-text-muted mt-3">
-          AI plans are limited to one generation per day per account. StackSmart includes your saved loans and the factors below, then asks Gemini Flash for a structured educational plan.
+          AI plans are limited to {generationStatus?.limit ?? 10} generations per day per account. StackSmart includes your saved loans and the factors below, then asks Gemini Flash for a structured educational plan.
         </p>
         {generationStatus?.used_today && (
           <div className="mt-4 bg-surface border border-warning/50 rounded-lg p-4 text-warning">
-            You already generated today's AI plan. Come back tomorrow to generate a new one.
+            You used all {generationStatus.limit} AI plans today. Come back tomorrow to generate more.
           </div>
+        )}
+        {generationStatus && !generationStatus.used_today && (
+          <p className="text-xs text-text-muted mt-3">
+            {generationStatus.remaining ?? Math.max(generationStatus.limit - (generationStatus.used_count ?? 0), 0)} AI plan generations remaining today.
+          </p>
         )}
 
         {/* Input Form */}
@@ -410,7 +417,7 @@ export default function InvestmentPlanPage() {
             disabled={loading || statusLoading || generationStatus?.used_today}
             className="w-full px-6 py-3 btn-gradient rounded-lg font-semibold text-gray-900 disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none disabled:cursor-not-allowed"
           >
-            {loading ? 'Generating AI Plan...' : generationStatus?.used_today ? 'AI Plan Used Today' : 'Generate My AI Plan'}
+            {loading ? 'Generating AI Plan...' : generationStatus?.used_today ? 'Daily AI Limit Reached' : 'Generate My AI Plan'}
           </button>
         </form>
 

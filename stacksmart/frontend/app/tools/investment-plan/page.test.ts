@@ -39,7 +39,7 @@ describe('InvestmentPlanPage auto-generation behavior', () => {
     expect(source).toContain('generatePersonalizedPlan');
     expect(source).toContain('session?.access_token');
     expect(source).toContain('loans.map');
-    expect(source).toContain('one generation per day');
-    expect(source).toContain('AI Plan Used Today');
+    expect(source).toContain('generations per day');
+    expect(source).toContain('Daily AI Limit Reached');
   });
 });

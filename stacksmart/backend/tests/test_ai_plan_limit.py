@@ -1,6 +1,6 @@
 """Tests for app.services.ai_plan_limit.
 
-Exercises the daily one-generation-per-user-per-UTC-day enforcement without
+Exercises the daily 10-generations-per-user-per-UTC-day enforcement without
 touching a real Supabase instance. The Supabase client is replaced by an
 in-memory stub via the `patched_supabase` fixture (see conftest.py).
 
@@ -14,9 +14,11 @@ import asyncio
 import pytest
 
 from app.services.ai_plan_limit import (
+    DAILY_AI_PLAN_LIMIT,
     DailyPlanLimitExceeded,
     complete_daily_generation,
     get_today_generation,
+    get_today_generations,
     release_failed_generation,
     reserve_daily_generation,
     today_utc,
@@ -48,12 +50,44 @@ def test_reserve_creates_row_with_user_and_today(patched_supabase):
     assert row["status"] == "pending"
     assert row["provider"] == "gemini"
     assert row["model"] == "gemini-2.0-flash"
+    assert row["generation_number"] == 1
     assert row["request_payload"] == {"monthly_investment_amount": 500}
     # id must be present and equal the returned id
     assert row["id"] == generation_id
 
 
-def test_reserve_duplicate_key_raises_daily_limit_exceeded(patched_supabase):
+def test_reserve_uses_next_available_generation_slot(patched_supabase):
+    patched_supabase.set_today_rows([
+        {"generation_number": 1, "status": "completed"},
+        {"generation_number": 2, "status": "completed"},
+    ])
+
+    asyncio.run(
+        reserve_daily_generation(
+            user_id="user-123", model="gemini-2.0-flash", request_payload={}
+        )
+    )
+
+    inserts = [c for c in patched_supabase.calls if c["method"] == "insert"]
+    assert inserts[0]["payload"]["generation_number"] == 3
+
+
+def test_reserve_raises_daily_limit_exceeded_at_ten_generations(patched_supabase):
+    patched_supabase.set_today_rows([
+        {"generation_number": number, "status": "completed"}
+        for number in range(1, DAILY_AI_PLAN_LIMIT + 1)
+    ])
+
+    with pytest.raises(DailyPlanLimitExceeded) as exc_info:
+        asyncio.run(
+            reserve_daily_generation(
+                user_id="user-123", model="gemini-2.0-flash", request_payload={}
+            )
+        )
+    assert "10 ai plans" in str(exc_info.value).lower()
+
+
+def test_reserve_duplicate_key_retries_next_slot(patched_supabase):
     from conftest import make_api_error
 
     patched_supabase.set_insert_error(make_api_error())
@@ -64,7 +98,7 @@ def test_reserve_duplicate_key_raises_daily_limit_exceeded(patched_supabase):
                 user_id="user-123", model="gemini-2.0-flash", request_payload={}
             )
         )
-    assert "already generated" in str(exc_info.value).lower()
+    assert "10 ai plans" in str(exc_info.value).lower()
 
 
 def test_reserve_other_api_error_is_reraised(patched_supabase):
@@ -128,6 +162,7 @@ def test_get_today_generation_returns_single_row(patched_supabase):
                 "status": "completed",
                 "provider": "gemini",
                 "model": "gemini-2.0-flash",
+                "generation_number": 1,
                 "created_at": "2026-01-01T00:00:00Z",
                 "completed_at": "2026-01-01T00:01:00Z",
             }
@@ -141,6 +176,17 @@ def test_get_today_generation_returns_single_row(patched_supabase):
     # select should target the ai_plan_generations table
     selects = [c for c in patched_supabase.calls if c["method"] == "select"]
     assert selects[0]["table"] == "ai_plan_generations"
+
+
+def test_get_today_generations_returns_all_today_rows(patched_supabase):
+    patched_supabase.set_today_rows([
+        {"id": "gen-1", "generation_number": 1, "status": "completed"},
+        {"id": "gen-2", "generation_number": 2, "status": "pending"},
+    ])
+
+    result = asyncio.run(get_today_generations("user-123"))
+    assert len(result) == 2
+    assert result[1]["id"] == "gen-2"
 
 
 def test_get_today_generation_returns_none_when_empty(patched_supabase):

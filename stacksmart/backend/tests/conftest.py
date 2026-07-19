@@ -93,6 +93,14 @@ class FakeTable:
         self._limit = n
         return self
 
+    def in_(self, *args: Any) -> "FakeTable":
+        self._eqs.append(("in", *args))
+        return self
+
+    def order(self, *args: Any, **kwargs: Any) -> "FakeTable":
+        self._client.calls.append({"method": "order", "table": self._name, "args": args, "kwargs": kwargs})
+        return self
+
     def execute(self):
         # INSERT path: honour a configured error (e.g. duplicate-key).
         if self._method == "insert" and self._client._insert_error is not None:
@@ -116,7 +124,7 @@ def patched_supabase(fake_client):
         yield fake_client
 
 
-def make_api_error(constraint: str = "ai_plan_generations_user_day_unique") -> APIError:
+def make_api_error(constraint: str = "ai_plan_generations_user_day_number_unique") -> APIError:
     """Build an APIError whose string form contains the unique-constraint name."""
     return APIError(
         {

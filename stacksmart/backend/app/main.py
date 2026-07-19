@@ -11,9 +11,10 @@ from app.middleware.auth import verify_user_token
 from app.services.user_service import save_financial_plan, get_user_plans, delete_plan
 from app.services import ai_financial_planner
 from app.services.ai_plan_limit import (
+    DAILY_AI_PLAN_LIMIT,
     DailyPlanLimitExceeded,
     complete_daily_generation,
-    get_today_generation,
+    get_today_generations,
     release_failed_generation,
     reserve_daily_generation,
 )
@@ -638,10 +639,14 @@ async def generate_financial_plan(
 @app.get("/api/plan/generate/status")
 async def get_financial_plan_generation_status(user_id: str = Depends(verify_user_token)):
     """Report whether the authenticated user has used today's AI plan generation."""
-    today = await get_today_generation(user_id)
+    today_generations = await get_today_generations(user_id)
+    today = today_generations[-1] if today_generations else None
+    used_count = len(today_generations)
     return {
-        "limit": 1,
-        "used_today": today is not None and today.get("status") in {"pending", "completed"},
+        "limit": DAILY_AI_PLAN_LIMIT,
+        "used_count": used_count,
+        "remaining": max(DAILY_AI_PLAN_LIMIT - used_count, 0),
+        "used_today": used_count >= DAILY_AI_PLAN_LIMIT,
         "generation": today,
     }
 

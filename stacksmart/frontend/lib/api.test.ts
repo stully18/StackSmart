@@ -69,7 +69,7 @@ describe('fetchPlanGenerationStatus', () => {
       makeResponse({
         ok: true,
         status: 200,
-        body: { limit: 1, used_today: false, generation: null },
+        body: { limit: 10, used_count: 0, remaining: 10, used_today: false, generation: null },
       })
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -81,7 +81,7 @@ describe('fetchPlanGenerationStatus', () => {
     expect(url).toBe('https://api.example.test/api/plan/generate/status');
     expect(init.headers.Authorization).toBe('Bearer tok-abc');
     expect(init.method ?? 'GET').toBe('GET');
-    expect(result).toEqual({ limit: 1, used_today: false, generation: null });
+    expect(result).toEqual({ limit: 10, used_count: 0, remaining: 10, used_today: false, generation: null });
   });
 
   it('throws an Error including the API detail on non-ok response', async () => {
