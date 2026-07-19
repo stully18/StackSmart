@@ -121,6 +121,20 @@ export interface DebtPriority {
   guaranteed_return: number;
 }
 
+export interface PersonalizedPlanGenerationStatus {
+  limit: number;
+  used_today: boolean;
+  generation: null | {
+    id: string;
+    generated_on: string;
+    status: 'pending' | 'completed' | 'failed';
+    provider: string;
+    model: string;
+    created_at: string;
+    completed_at: string | null;
+  };
+}
+
 export interface MultiLoanResult {
   overall_recommendation: 'pay_debts' | 'invest';
   debt_priorities: DebtPriority[];

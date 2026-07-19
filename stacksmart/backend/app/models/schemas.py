@@ -130,6 +130,11 @@ class PersonalizedPlanRequest(BaseModel):
     include_roth_ira: bool = Field(default=False, description="Allocate to Roth IRA before brokerage")
     current_emergency_fund: float = Field(default=0.0, ge=0, description="Current emergency fund balance")
     emergency_fund_months_target: int = Field(default=3, ge=1, le=12, description="Target months of expenses in emergency fund")
+    # AI planner inputs (loans + optional extra factors)
+    loans: List[LoanData] = Field(default_factory=list, description="User loans to consider in the plan")
+    age: Optional[int] = Field(default=None, ge=13, le=100, description="User age, if provided")
+    tax_filing_status: Optional[str] = Field(default=None, max_length=64, description="Optional tax filing status")
+    notes: Optional[str] = Field(default=None, max_length=1000, description="Optional user-provided planning context")
 
 class PersonalizedPlanResult(BaseModel):
     portfolio_name: str
