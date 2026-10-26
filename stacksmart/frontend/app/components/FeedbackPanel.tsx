@@ -2,7 +2,8 @@
 
 import { FormEvent, useState } from 'react'
 import { CheckCircle2, MessageSquare, Send, XCircle } from 'lucide-react'
-import { useAuth } from '@/app/context/AuthContext'
+import { useAuth } from '@/app/context/AuthContext';
+import { logAppEvent } from '@/lib/loans';
 
 interface FeedbackPanelProps {
   source: string
@@ -53,6 +54,15 @@ export default function FeedbackPanel({ source }: FeedbackPanelProps) {
       setNote('')
       setReaction('useful')
       setStatus('success')
+
+      // Best-effort event log; never block on it or surface its failure.
+      try {
+        await logAppEvent('feedback_submitted', { source, reaction })
+      } catch (eventErr) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[FeedbackPanel] feedback_submitted event logging failed:', eventErr)
+        }
+      }
     } catch (error) {
       console.error('[FeedbackPanel] Feedback submission failed:', error)
       setStatus('error')

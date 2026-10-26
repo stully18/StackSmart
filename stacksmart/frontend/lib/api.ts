@@ -51,3 +51,34 @@ export async function optimizeFinancialPath(
 
   return response.json();
 }
+
+export async function fetchPlanGenerationStatus(accessToken: string) {
+  const response = await fetch(`${API_BASE_URL}/api/plan/generate/status`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Unable to check AI plan usage.'));
+  }
+
+  return response.json();
+}
+
+export async function generatePersonalizedPlan(payload: unknown, accessToken: string) {
+  const response = await fetch(`${API_BASE_URL}/api/plan/generate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getApiErrorMessage(response, 'Unable to generate a plan from those inputs. Please adjust the numbers and try again.'));
+  }
+
+  return response.json();
+}

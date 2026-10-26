@@ -1,6 +1,21 @@
 'use client'
 
 import { supabase } from './supabase'
+import { logAppEvent } from './loans'
+
+// Best-effort event logging: never let a logging failure block auth success.
+async function logEventQuietly(
+  eventType: Parameters<typeof logAppEvent>[0],
+  metadata: Record<string, unknown> = {},
+): Promise<void> {
+  try {
+    await logAppEvent(eventType, metadata)
+  } catch (err) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[auth] ${eventType} event logging failed:`, err)
+    }
+  }
+}
 
 interface SignUpData {
   email: string
@@ -26,6 +41,11 @@ export async function signUp({ email, password, fullName }: SignUpData) {
 
     if (authError) throw authError
 
+    // Best-effort: only log when we actually have a confirmed/created user.
+    if (authData.user) {
+      await logEventQuietly('account_created', { source: 'signup_form', email })
+    }
+
     return { user: authData.user, session: authData.session, error: null }
   } catch (error) {
     return { user: null, session: null, error }
@@ -40,6 +60,7 @@ export async function signIn({ email, password }: SignInData) {
     })
 
     if (error) throw error
+    await logEventQuietly('sign_in', { source: 'login_form', email })
     return { user: data.user, session: data.session, error: null }
   } catch (error) {
     return { user: null, session: null, error }
@@ -47,6 +68,8 @@ export async function signIn({ email, password }: SignInData) {
 }
 
 export async function signOut() {
+  // Log before signing out so auth.uid() is still populated server-side.
+  await logEventQuietly('sign_out', { source: 'auth_context' })
   const { error } = await supabase.auth.signOut()
   return { error }
 }

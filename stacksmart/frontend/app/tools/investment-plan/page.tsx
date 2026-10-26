@@ -9,7 +9,17 @@ import { useAuth } from '../../context/AuthContext';
 import { useFinancialData } from '../../context/FinancialContext';
 import BetaNotice from '@/app/components/BetaNotice';
 import FeedbackPanel from '@/app/components/FeedbackPanel';
-import { getApiBaseUrl, getApiErrorMessage } from '@/lib/api';
+import { fetchPlanGenerationStatus, generatePersonalizedPlan } from '@/lib/api';
+import { loadUserLoans, logAppEvent } from '@/lib/loans';
+import type {
+  Loan,
+  PersonalizedPlanGenerationStatus,
+  AdvisorCard,
+  MonthlyActionPlan,
+  SatelliteStockIdea,
+  AdvisorAssumptions,
+  PlanSource,
+} from '@/types';
 
 interface ETFAllocation {
   ticker: string;
@@ -42,12 +52,61 @@ interface PersonalizedPlanResult {
   next_steps: string[];
   warnings: string[] | null;
   months_to_emergency_fund: number | null;
+  advisor_summary?: string | null;
+  advisor_cards?: AdvisorCard[];
+  monthly_action_plan?: MonthlyActionPlan | null;
+  satellite_stock_ideas?: SatelliteStockIdea[];
+  advisor_assumptions?: AdvisorAssumptions | null;
+  plan_source?: PlanSource;
+}
+
+interface InvestmentPlanFormData {
+  monthly_investment_amount: number | '';
+  risk_tolerance: '' | 'conservative' | 'moderate' | 'aggressive';
+  financial_goal: '' | 'wealth_building' | 'income_generation' | 'capital_preservation' | 'debt_freedom';
+  current_savings: number | '';
+  has_emergency_fund: boolean;
+  include_roth_ira: boolean;
+  monthly_gross_income: number | '';
+  monthly_expenses: number | '';
+  current_emergency_fund: number | '';
+  emergency_fund_months_target: number | '';
+  age: number | '';
+  notes: string;
+}
+
+const emptyFormData: InvestmentPlanFormData = {
+  monthly_investment_amount: '',
+  risk_tolerance: '',
+  financial_goal: '',
+  current_savings: '',
+  has_emergency_fund: false,
+  include_roth_ira: false,
+  monthly_gross_income: '',
+  monthly_expenses: '',
+  current_emergency_fund: '',
+  emergency_fund_months_target: 3,
+  age: '',
+  notes: '',
+};
+
+// Sort advisor cards by priority ascending and keep 6-8 for the dashboard.
+function prioritizedAdvisorCards(cards: AdvisorCard[] | undefined): AdvisorCard[] {
+  if (!cards || cards.length === 0) return [];
+  const sorted = [...cards].sort((a, b) => a.priority - b.priority);
+  // Show a denser 6-8 card dashboard when more are available.
+  return sorted.length > 8 ? sorted.slice(0, 8) : sorted;
+}
+
+function formatUsd(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) return '—';
+  return `$${amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
 export default function InvestmentPlanPage() {
   const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
-  const { financialData, updateFinancialData } = useFinancialData();
+  const { user, session, isLoading: authLoading } = useAuth();
+  const { updateFinancialData } = useFinancialData();
 
   // Redirect to login only AFTER auth finishes loading and there's truly no user
   useEffect(() => {
@@ -56,76 +115,121 @@ export default function InvestmentPlanPage() {
     }
   }, [user, authLoading, router]);
 
-  const [formData, setFormData] = useState({
-    monthly_investment_amount: financialData.monthlyBudget,
-    risk_tolerance: financialData.riskTolerance,
-    financial_goal: financialData.financialGoal,
-    current_savings: financialData.currentSavings,
-    has_emergency_fund: financialData.hasEmergencyFund,
-    include_roth_ira: false,
-  });
+  useEffect(() => {
+    if (!user || !session?.access_token) return;
+
+    let isMounted = true;
+
+    const loadAiInputs = async () => {
+      setStatusLoading(true);
+      try {
+        const [savedLoans, status] = await Promise.all([
+          loadUserLoans(),
+          fetchPlanGenerationStatus(session.access_token),
+        ]);
+        if (isMounted) {
+          setLoans(savedLoans);
+          setGenerationStatus(status);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Unable to load AI planning inputs.');
+        }
+      } finally {
+        if (isMounted) setStatusLoading(false);
+      }
+    };
+
+    loadAiInputs();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, session?.access_token]);
+
+  const [formData, setFormData] = useState<InvestmentPlanFormData>(emptyFormData);
 
   const [plan, setPlan] = useState<PersonalizedPlanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoGenerate, setAutoGenerate] = useState(true);
-
-  // Auto-generate plan on first load if coming from dashboard with data
-  useEffect(() => {
-    if (autoGenerate && financialData.monthlyBudget > 0) {
-      setAutoGenerate(false);
-      handleSubmit();
-    }
-  }, []);
-
-  // Update form when context changes
-  useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      monthly_investment_amount: financialData.monthlyBudget,
-      current_savings: financialData.currentSavings,
-      has_emergency_fund: financialData.hasEmergencyFund,
-      risk_tolerance: financialData.riskTolerance,
-      financial_goal: financialData.financialGoal,
-    }));
-  }, [financialData]);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [generationStatus, setGenerationStatus] = useState<PersonalizedPlanGenerationStatus | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+
+    const monthlyInvestmentAmount = Number(formData.monthly_investment_amount);
+    const currentSavings = Number(formData.current_savings);
+    if (
+      !monthlyInvestmentAmount ||
+      currentSavings < 0 ||
+      !formData.risk_tolerance ||
+      !formData.financial_goal
+    ) {
+      setError('Please complete the investment amount, savings, risk tolerance, and goal before generating a plan.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
+    if (!session?.access_token) {
+      setError('Please sign in again before generating an AI plan.');
+      setLoading(false);
+      return;
+    }
+
+    if (generationStatus?.used_today) {
+      setError('You already generated your AI plan today. Please come back tomorrow.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const API_BASE_URL = getApiBaseUrl();
       const payload = {
         ...formData,
+        monthly_investment_amount: monthlyInvestmentAmount,
+        current_savings: currentSavings,
         time_horizon_years: 10,
-        monthly_gross_income: null,
-        monthly_expenses: null,
-        employer_401k_match_percent: null,
+        monthly_gross_income: formData.monthly_gross_income === '' ? null : Number(formData.monthly_gross_income),
+        monthly_expenses: formData.monthly_expenses === '' ? null : Number(formData.monthly_expenses),
+        current_emergency_fund: formData.current_emergency_fund === '' ? 0 : Number(formData.current_emergency_fund),
+        emergency_fund_months_target: formData.emergency_fund_months_target === '' ? 3 : Number(formData.emergency_fund_months_target),
+        age: formData.age === '' ? null : Number(formData.age),
+        notes: formData.notes.trim() || null,
+        loans: loans.map(({ id, ...loan }) => ({
+          ...loan,
+          interest_rate: loan.interest_rate / 100,
+        })),
       };
-      const response = await fetch(`${API_BASE_URL}/api/plan/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
+      const data = await generatePersonalizedPlan(payload, session.access_token);
+
+      setPlan(data);
+      setGenerationStatus({
+        limit: generationStatus?.limit ?? 10,
+        used_count: Math.min((generationStatus?.used_count ?? 0) + 1, generationStatus?.limit ?? 10),
+        remaining: Math.max((generationStatus?.remaining ?? 10) - 1, 0),
+        used_today: ((generationStatus?.used_count ?? 0) + 1) >= (generationStatus?.limit ?? 10),
+        generation: null,
       });
 
-      if (!response.ok) {
-        throw new Error(await getApiErrorMessage(response, 'Unable to generate a plan from those inputs. Please adjust the numbers and try again.'));
+      // Best-effort event log; never block on it or surface its failure.
+      try {
+        await logAppEvent('report_generated', { source: 'investment_plan', risk_tolerance: formData.risk_tolerance });
+      } catch (eventErr) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[InvestmentPlan] report_generated event logging failed:', eventErr);
+        }
       }
-
-      const data = await response.json();
-      setPlan(data);
 
       // Sync form data back to context
       updateFinancialData({
-        monthlyBudget: formData.monthly_investment_amount,
-        currentSavings: formData.current_savings,
+        monthlyBudget: monthlyInvestmentAmount,
+        currentSavings,
         hasEmergencyFund: formData.has_emergency_fund,
-        riskTolerance: formData.risk_tolerance as any,
-        financialGoal: formData.financial_goal as any,
+        riskTolerance: formData.risk_tolerance,
+        financialGoal: formData.financial_goal,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -182,6 +286,12 @@ export default function InvestmentPlanPage() {
             message="This tool uses simplified assumptions and broad ETF examples. Confirm fund choices, tax treatment, and account type before placing trades."
           />
         </div>
+
+        {generationStatus?.used_today && (
+          <div className="mt-4 bg-surface border border-warning/50 rounded-lg p-4 text-warning">
+            You used all {generationStatus.limit} AI plans today. Come back tomorrow to generate more.
+          </div>
+        )}
 
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="bg-surface border border-border-subtle rounded-xl p-6 mb-8 space-y-8">
@@ -256,7 +366,9 @@ export default function InvestmentPlanPage() {
                   value={formData.risk_tolerance}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                  required
                 >
+                  <option value="" disabled>Select risk tolerance</option>
                   <option value="conservative">Conservative</option>
                   <option value="moderate">Moderate</option>
                   <option value="aggressive">Aggressive</option>
@@ -269,7 +381,9 @@ export default function InvestmentPlanPage() {
                   value={formData.financial_goal}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                  required
                 >
+                  <option value="" disabled>Select primary goal</option>
                   <option value="wealth_building">Wealth Building</option>
                   <option value="income_generation">Income Generation</option>
                   <option value="capital_preservation">Capital Preservation</option>
@@ -292,12 +406,37 @@ export default function InvestmentPlanPage() {
             </div>
           </div>
 
+          <div className="border-t border-border-subtle" />
+          <div>
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Advisor Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <input type="number" name="monthly_gross_income" value={formData.monthly_gross_income} onChange={handleChange} min="0" step="1" placeholder="Monthly gross income" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
+              <input type="number" name="monthly_expenses" value={formData.monthly_expenses} onChange={handleChange} min="0" step="1" placeholder="Monthly expenses" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
+              <input type="number" name="current_emergency_fund" value={formData.current_emergency_fund} onChange={handleChange} min="0" step="1" placeholder="Emergency fund saved" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
+              <input type="number" name="emergency_fund_months_target" value={formData.emergency_fund_months_target} onChange={handleChange} min="1" max="12" step="1" placeholder="Emergency fund months target" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
+              <input type="number" name="age" value={formData.age} onChange={handleChange} min="13" max="100" step="1" placeholder="Age" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
+              <div className="md:col-span-3">
+                <textarea
+                  name="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  maxLength={1000}
+                  placeholder="Any future goals or anything the AI Advisor should know?"
+                  className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70 min-h-24"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-text-muted/70 mt-3">
+              {loans.length} saved loan{loans.length === 1 ? '' : 's'} included from Debt Optimizer.
+            </p>
+          </div>
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || statusLoading || generationStatus?.used_today}
             className="w-full px-6 py-3 btn-gradient rounded-lg font-semibold text-gray-900 disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none disabled:cursor-not-allowed"
           >
-            {loading ? 'Generating Plan...' : 'Generate My Investment Plan'}
+            {loading ? 'Generating AI Plan...' : generationStatus?.used_today ? 'Daily AI Limit Reached' : 'Generate My AI Plan'}
           </button>
         </form>
 
@@ -311,6 +450,201 @@ export default function InvestmentPlanPage() {
         {/* Results Display */}
         {plan && (
           <div className="space-y-6">
+            {/* AI Advisor Dashboard (top-level, before ETF allocation) */}
+            {(() => {
+              const cards = prioritizedAdvisorCards(plan.advisor_cards);
+              const isRuleBased = plan.plan_source === 'rule_based';
+              const showDashboard = Boolean(plan.advisor_summary || cards.length > 0);
+              if (!showDashboard) return null;
+
+              return (
+                <div className="space-y-6">
+                  {isRuleBased && (
+                    <div className="bg-surface border-l-4 border-warning border-t border-r border-b border-t-border-subtle border-r-border-subtle border-b-border-subtle rounded-lg p-4">
+                      <h3 className="text-base font-semibold mb-1 text-warning">Rule-based fallback</h3>
+                      <p className="text-sm text-text-secondary">
+                        AI plan generation is unavailable, so StackSmart built this advisor dashboard from your
+                        inputs using a deterministic rule-based fallback. It is educational guidance, not professional advice.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="bg-surface border border-primary/30 rounded-xl p-6">
+                    <h2 className="text-2xl font-semibold tracking-tight text-text-primary mb-2">Your AI Advisor Plan</h2>
+                    {plan.advisor_summary && (
+                      <p className="text-text-muted mb-4">{plan.advisor_summary}</p>
+                    )}
+
+                    {cards.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {cards.map((card) => (
+                          <div
+                            key={`${card.category}-${card.priority}`}
+                            className="bg-surface-elevated/30 border border-border-subtle rounded-xl p-4 hover:border-border transition-colors"
+                          >
+                            <div className="flex justify-between items-start gap-3 mb-2">
+                              <div>
+                                <h4 className="font-semibold text-lg text-text-primary">{card.title}</h4>
+                                <p className="text-xs uppercase tracking-widest text-text-muted">{card.category.replace('_', ' ')}</p>
+                              </div>
+                            </div>
+                            <p className="text-sm text-text-secondary mb-2">{card.recommendation}</p>
+                            <p className="text-xs text-text-muted mb-3">{card.rationale}</p>
+                            {card.action_items && card.action_items.length > 0 && (
+                              <ul className="space-y-1 mb-3">
+                                {card.action_items.map((item, idx) => (
+                                  <li key={idx} className="text-sm text-text-secondary flex items-start gap-2">
+                                    <Check size={14} className="text-primary mt-0.5" />
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {card.monthly_amount !== null && card.monthly_amount !== undefined && (
+                              <div className="text-sm">
+                                <span className="text-text-muted">Monthly: </span>
+                                <span className="text-success font-semibold">{formatUsd(card.monthly_amount)}/mo</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Monthly Action Plan */}
+                  {plan.monthly_action_plan && (() => {
+                    const map = plan.monthly_action_plan;
+                    return (
+                      <div className="bg-surface border border-border-subtle rounded-xl p-6">
+                        <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">Monthly Action Plan</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted">Available Monthly</div>
+                            <div className="text-2xl font-semibold text-text-primary">{formatUsd(map.available_monthly_amount)}</div>
+                          </div>
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted">ETF Investing</div>
+                            <div className="text-2xl font-semibold text-success">{formatUsd(map.etf_investing_amount)}</div>
+                          </div>
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted">Extra Debt Payoff</div>
+                            <div className="text-2xl font-semibold text-primary">{formatUsd(map.debt_extra_payment_amount)}</div>
+                          </div>
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted">Emergency Fund</div>
+                            <div className="text-2xl font-semibold text-text-primary">{formatUsd(map.emergency_fund_amount)}</div>
+                          </div>
+                        </div>
+                        {map.notes && map.notes.length > 0 && (
+                          <ul className="mt-4 space-y-1">
+                            {map.notes.map((note, idx) => (
+                              <li key={idx} className="text-xs text-text-muted flex items-start gap-2">
+                                <AlertTriangle size={12} className="text-warning mt-0.5" />
+                                {note}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Optional Satellite Stock Ideas */}
+                  {plan.satellite_stock_ideas && plan.satellite_stock_ideas.length > 0 && (
+                    <div className="bg-surface border border-border-subtle rounded-xl p-6">
+                      <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-1">Optional Satellite Stock Ideas</h3>
+                      <p className="text-sm text-text-muted mb-4">
+                        Keep diversified ETFs as the core. These individual stocks are small, optional satellite picks only.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {plan.satellite_stock_ideas.map((idea) => (
+                          <div
+                            key={idea.ticker}
+                            className="bg-surface-elevated/30 border border-warning/30 rounded-xl p-4"
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h4 className="font-semibold text-lg text-text-primary">{idea.ticker}</h4>
+                                <p className="text-sm text-text-muted">{idea.name}</p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-semibold text-text-primary">{idea.allocation_percent}%</div>
+                                <div className="text-sm text-text-muted">{formatUsd(idea.monthly_amount)}/mo</div>
+                              </div>
+                            </div>
+                            <p className="text-sm text-text-secondary mb-2">{idea.reason}</p>
+                            <p className="text-xs text-warning">Risk: {idea.risk_note}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Plan Assumptions */}
+                  {plan.advisor_assumptions && (() => {
+                    const a = plan.advisor_assumptions!;
+                    return (
+                      <div className="bg-surface border border-border-subtle rounded-xl p-6">
+                        <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">
+                          Plan Assumptions
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted mb-2">Data Used</div>
+                            {a.data_used.length > 0 ? (
+                              <ul className="space-y-1">
+                                {a.data_used.map((item, idx) => (
+                                  <li key={idx} className="text-sm text-text-secondary flex items-start gap-2">
+                                    <Check size={14} className="text-success mt-0.5" />
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-text-muted">No supplementary data provided.</p>
+                            )}
+                          </div>
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted mb-2">Missing Data</div>
+                            {a.missing_data.length > 0 ? (
+                              <ul className="space-y-1">
+                                {a.missing_data.map((item, idx) => (
+                                  <li key={idx} className="text-sm text-text-secondary flex items-start gap-2">
+                                    <AlertTriangle size={14} className="text-warning mt-0.5" />
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-text-muted">No notable gaps.</p>
+                            )}
+                          </div>
+                          <div className="bg-surface-elevated/30 border border-border-subtle rounded-lg p-4">
+                            <div className="text-sm text-text-muted mb-2">
+                              Caveats
+                            </div>
+                            {a.caveats.length > 0 ? (
+                              <ul className="space-y-1">
+                                {a.caveats.map((item, idx) => (
+                                  <li key={idx} className="text-sm text-text-secondary flex items-start gap-2">
+                                    <AlertTriangle size={14} className="text-warning mt-0.5" />
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-text-muted">No caveats noted.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              );
+            })()}
+
             {/* Portfolio Overview */}
             <div className="bg-surface border border-border-subtle rounded-xl p-6">
               <h2 className="text-2xl font-semibold tracking-tight text-text-primary mb-2">{plan.portfolio_name}</h2>
@@ -348,7 +682,10 @@ export default function InvestmentPlanPage() {
 
             {/* ETF Allocations */}
             <div className="bg-surface border border-border-subtle rounded-xl p-6">
-              <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">Your Portfolio Allocation</h3>
+              <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-1">Core ETF Allocation Details</h3>
+              <p className="text-sm text-text-muted mb-4">
+                This is the investable core behind the advisor recommendations above.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {plan.target_allocation.map((etf) => (
                   <div key={etf.ticker} className="bg-surface-elevated/30 border border-border-subtle rounded-xl p-4 hover:border-border transition-colors">
@@ -434,7 +771,7 @@ export default function InvestmentPlanPage() {
 
             {/* Reasoning */}
             <div className="bg-surface border border-border-subtle rounded-xl p-6">
-              <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">Why This Portfolio?</h3>
+              <h3 className="text-xl font-semibold tracking-tight text-text-primary mb-4">Why This Advisor Plan?</h3>
               <ul className="space-y-3">
                 {plan.reasoning.map((reason, idx) => (
                   <li key={idx} className="flex items-start gap-3">
