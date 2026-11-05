@@ -325,7 +325,7 @@ def _request_advice(
                     "parameters": schema,
                 }}],
                 "tool_choice": {"type": "function", "function": {"name": "submit_financial_advice"}},
-                **({"reasoning": {"enabled": False}} if model != "openrouter/free" else {}),
+                "reasoning": {"enabled": False},
                 "max_tokens": 5000,
                 "provider": {"max_price": {"prompt": 0, "completion": 0}},
             },

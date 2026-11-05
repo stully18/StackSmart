@@ -348,7 +348,7 @@ def test_free_fallback_uses_correct_request_and_preserves_calculations(monkeypat
     assert calls[0]["timeout"] == (10, 20)
     assert calls[1]["json"]["model"] == "openrouter/free"
     assert calls[1]["timeout"] == (10, 40)
-    assert "reasoning" not in calls[1]["json"]
+    assert calls[1]["json"]["reasoning"] == {"enabled": False}
     assert calls[1]["json"]["provider"]["max_price"] == {"prompt": 0, "completion": 0}
     assert plan.ai_model == "openrouter/free"
     assert plan.target_allocation == _sample_plan().target_allocation
