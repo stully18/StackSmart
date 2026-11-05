@@ -279,3 +279,29 @@ def test_sanitize_ai_plan_sets_source_and_limits_satellite_stock_exposure():
     assert result.satellite_stock_ideas[0].allocation_percent <= 10
     assert result.satellite_stock_ideas[0].monthly_amount <= 100
     assert any("educational" in warning.lower() for warning in result.warnings)
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf"), None])
+def test_nonfinite_market_data_can_be_persisted_as_json(monkeypatch, invalid):
+    import json
+    from app.services import personalized_planner
+    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "false")
+    monkeypatch.setattr(personalized_planner.market_data_fetcher, "get_multiple_etf_data", lambda tickers: {
+        ticker: {"price": invalid, "expense_ratio": invalid, "ytd_return": invalid, "one_year_return": invalid}
+        for ticker in tickers
+    })
+    plan = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=300))
+    json.dumps(plan.model_dump(mode="json"), allow_nan=False)
+    assert all(etf.current_price > 0 for etf in plan.target_allocation)
+    assert all(etf.ytd_return is None and etf.one_year_return is None for etf in plan.target_allocation)
+    assert any("illustrative fallback" in warning for warning in plan.warnings)
+
+
+def test_zero_market_returns_are_preserved(monkeypatch):
+    from app.services import personalized_planner
+    monkeypatch.setattr(personalized_planner.market_data_fetcher, "get_multiple_etf_data", lambda tickers: {
+        ticker: {"price": 100, "expense_ratio": 0, "ytd_return": 0, "one_year_return": 0}
+        for ticker in tickers
+    })
+    plan = personalized_planner.generate_personalized_plan(PersonalizedPlanRequest(monthly_investment_amount=300))
+    assert all(etf.ytd_return == 0 and etf.one_year_return == 0 and etf.expense_ratio == 0 for etf in plan.target_allocation)

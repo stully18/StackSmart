@@ -207,6 +207,7 @@ def generate_personalized_plan(request: PersonalizedPlanRequest) -> Personalized
     # Build ETF allocations from cached data
     etf_allocations = []
     total_expense_ratio = 0.0
+    used_fallback_market_data = False
 
     for ticker, percentage in allocation.items():
         if percentage <= 0:
@@ -214,6 +215,25 @@ def generate_personalized_plan(request: PersonalizedPlanRequest) -> Personalized
 
         # Get market data from batch result
         etf_data = all_etf_data.get(ticker, market_data_fetcher.get_demo_etf_data(ticker))
+        # Quote series can contain non-finite values despite a successful fetch.
+        etf_data = dict(etf_data)
+        demo_data = market_data_fetcher.get_demo_etf_data(ticker)
+        for field in ("price", "expense_ratio"):
+            value = etf_data.get(field)
+            try:
+                valid = math.isfinite(float(value)) and (float(value) > 0 if field == "price" else float(value) >= 0)
+            except (TypeError, ValueError, OverflowError):
+                valid = False
+            if not valid:
+                etf_data[field] = demo_data[field]
+                used_fallback_market_data = True
+        for field in ("ytd_return", "one_year_return"):
+            value = etf_data.get(field)
+            try:
+                valid = value is not None and math.isfinite(float(value))
+            except (TypeError, ValueError, OverflowError):
+                valid = False
+            etf_data[field] = float(value) if valid else None
         monthly_amount = (percentage / 100) * effective_monthly
 
         # Get ETF metadata
@@ -264,6 +284,8 @@ def generate_personalized_plan(request: PersonalizedPlanRequest) -> Personalized
 
     # Generate warnings if needed
     warnings = generate_warnings(request)
+    if used_fallback_market_data:
+        warnings.append("Some ETF prices or fees were unavailable; illustrative fallback values are shown. Verify current prices and fees before acting.")
 
     # Monthly breakdown
     monthly_breakdown = {
