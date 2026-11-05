@@ -39,6 +39,9 @@ _cors_origins = [
     "http://127.0.0.1:3002",
     "https://stacksmart.dev",
     "https://www.stacksmart.dev",
+    "https://frat-finance.vercel.app",
+    "https://stacksmart-shanes-projects-0e41aad5.vercel.app",
+    "https://stacksmart-git-main-shanes-projects-0e41aad5.vercel.app",
 ]
 _frontend_url = os.getenv("FRONTEND_URL")
 if _frontend_url:

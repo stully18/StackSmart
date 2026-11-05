@@ -56,3 +56,29 @@ def test_generation_runs_off_event_loop_and_persists_once(planning_client, monke
     assert threads["generation"] != threads["event_loop"]
     complete.assert_awaited_once()
     release.assert_not_awaited()
+
+
+@pytest.mark.parametrize("origin", [
+    "https://stacksmart.dev", "https://www.stacksmart.dev",
+    "https://frat-finance.vercel.app",
+    "https://stacksmart-shanes-projects-0e41aad5.vercel.app",
+    "https://stacksmart-git-main-shanes-projects-0e41aad5.vercel.app",
+])
+def test_production_origins_can_preflight_authenticated_planning(planning_client, origin):
+    client, *_ = planning_client
+    response = client.options("/api/plan/generate", headers={
+        "Origin": origin, "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization,content-type",
+    })
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+
+
+def test_unrecognized_origin_is_not_allowed(planning_client):
+    client, *_ = planning_client
+    response = client.options("/api/plan/generate", headers={
+        "Origin": "https://untrusted.example", "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization,content-type",
+    })
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
