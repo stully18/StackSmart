@@ -321,14 +321,19 @@ def test_zero_market_returns_are_preserved(monkeypatch):
     assert all(etf.ytd_return == 0 and etf.one_year_return == 0 and etf.expense_ratio == 0 for etf in plan.target_allocation)
 
 
-@pytest.mark.parametrize("bad_amount", [-1, 501, float("inf")])
-def test_ai_advice_rejects_invalid_monthly_budget(monkeypatch, openrouter_setup, bad_amount):
+def test_ai_cannot_override_the_calculated_monthly_budget(monkeypatch, openrouter_setup):
     import json
     advice = json.loads(_sample_advice())
-    advice["monthly_action_plan"] = {"etf_investing_amount": bad_amount, "debt_extra_payment_amount": 0, "emergency_fund_amount": 0}
+    advice["monthly_action_plan"] = {"etf_investing_amount": 9000, "debt_extra_payment_amount": 9000, "emergency_fund_amount": 9000}
     monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(advice)}}]}))
-    with pytest.raises(ai_financial_planner.AIPlanError, match="invalid or incomplete"):
-        generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, monthly_expenses=1000))
+    result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, monthly_expenses=1000))
+    action = result.monthly_action_plan
+    assert action.available_monthly_amount == 500
+    assert action.etf_investing_amount + action.debt_extra_payment_amount + action.emergency_fund_amount == 500
+    assert action.emergency_fund_amount == 500
+    schema = ai_financial_planner.AdvisorResponse.model_json_schema()
+    assert "monthly_action_plan" not in schema["properties"]
+    assert "monthly_amount" not in schema["$defs"]["AdviceCard"]["properties"]
 
 
 @pytest.mark.parametrize("failure", ["timeout", "invalid"])
@@ -356,13 +361,18 @@ def test_free_fallback_uses_correct_request_and_preserves_calculations(monkeypat
 
 
 def test_monthly_advice_keeps_portfolio_dollars_and_projections_consistent(monkeypatch, openrouter_setup):
-    import json
-    advice = json.loads(_sample_advice())
-    advice["monthly_action_plan"] = {"etf_investing_amount": 200, "debt_extra_payment_amount": 250, "emergency_fund_amount": 50}
-    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(advice)}}]}))
-    result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, monthly_expenses=1000))
-    assert sum(etf.monthly_amount for etf in result.target_allocation) == 200
-    assert result.monthly_investment_breakdown == {"VOO": 200}
-    assert result.monthly_action_plan.available_monthly_amount == 500
-    expected = ai_financial_planner.personalized_planner.calculate_future_value(0, 200, 0.08, 30)
+    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": _sample_advice()}}]}))
+    result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, monthly_expenses=1000, current_emergency_fund=2000))
+    assert sum(etf.monthly_amount for etf in result.target_allocation) == 333.33
+    assert result.monthly_investment_breakdown == {"VOO": 333.33}
+    assert result.monthly_action_plan.emergency_fund_amount == 166.67
+    expected = ai_financial_planner.personalized_planner.calculate_future_value(0, 333.33, 0.08, 30)
     assert result.projected_value_30yr == round(expected, 2)
+
+
+def test_monthly_split_prioritizes_expensive_debt_after_emergency_savings():
+    request = PersonalizedPlanRequest(monthly_investment_amount=300, has_emergency_fund=True, loans=[{"loan_type":"credit_card","loan_name":"Synthetic","principal":5000,"interest_rate":0.22,"minimum_payment":100}])
+    action = ai_financial_planner._monthly_action_plan(request)
+    assert action.debt_extra_payment_amount == 300
+    assert action.etf_investing_amount == 0
+    assert action.emergency_fund_amount == 0
