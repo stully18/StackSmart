@@ -175,6 +175,7 @@ class AdvisorAssumptions(BaseModel):
 
 
 class PersonalizedPlanResult(BaseModel):
+    ai_model: Optional[str] = None
     portfolio_name: str
     risk_profile: str
     target_allocation: List[ETFAllocation]

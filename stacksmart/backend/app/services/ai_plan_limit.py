@@ -104,7 +104,9 @@ async def reserve_daily_generation(user_id: str, model: str, request_payload: di
 async def complete_daily_generation(generation_id: str, response_payload: dict[str, Any]) -> None:
     """Mark a reserved generation as completed and store its response payload."""
     supabase = get_supabase_client()
+    model_metadata = {"model": response_payload["ai_model"]} if response_payload.get("ai_model") else {}
     supabase.table("ai_plan_generations").update({
+        **model_metadata,
         "status": "completed",
         "response_payload": response_payload,
         "completed_at": datetime.now(timezone.utc).isoformat(),

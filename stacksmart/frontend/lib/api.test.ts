@@ -239,3 +239,16 @@ describe('generatePersonalizedPlan', () => {
     expect(result.plan_source).toBe('ai');
   });
 });
+
+
+describe('planning network errors', () => {
+  it('explains connection failures instead of showing Failed to fetch', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    await expect(generatePersonalizedPlan({}, 'token')).rejects.toThrow('Unable to connect to StackSmart');
+  });
+
+  it('explains timeouts without implying that a plan was generated', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('Timed out', 'TimeoutError')));
+    await expect(generatePersonalizedPlan({}, 'token')).rejects.toThrow('Plan generation took too long');
+  });
+});

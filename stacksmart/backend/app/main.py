@@ -1,3 +1,5 @@
+from starlette.concurrency import run_in_threadpool
+
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -616,7 +618,7 @@ async def generate_financial_plan(
         )
         print(f"[DEBUG] Generating AI plan for user={user_id}, model={model}")
 
-        plan = ai_financial_planner.generate_ai_financial_plan(request)
+        plan = await run_in_threadpool(ai_financial_planner.generate_ai_financial_plan, request)
 
         await complete_daily_generation(generation_id, plan.model_dump(mode="json"))
         return plan
@@ -633,6 +635,8 @@ async def generate_financial_plan(
                 print(f"[WARN] Failed to release AI generation reservation: {release_error}")
         import traceback
         traceback.print_exc()
+        if isinstance(e, ai_financial_planner.AIPlanError):
+            raise HTTPException(status_code=e.status_code, detail=str(e))
         raise HTTPException(status_code=500, detail="AI plan generation is unavailable right now. Please try again later.")
 
 

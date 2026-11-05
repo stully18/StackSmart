@@ -192,3 +192,9 @@ def test_get_today_generations_returns_all_today_rows(patched_supabase):
 def test_get_today_generation_returns_none_when_empty(patched_supabase):
     patched_supabase.set_today_rows([])
     assert asyncio.run(get_today_generation("user-123")) is None
+
+
+def test_completion_records_model_that_generated_advice(patched_supabase):
+    asyncio.run(complete_daily_generation("generation", {"ai_model": "openrouter/free"}))
+    updates = [call for call in patched_supabase.calls if call["method"] == "update"]
+    assert updates[0]["payload"]["model"] == "openrouter/free"

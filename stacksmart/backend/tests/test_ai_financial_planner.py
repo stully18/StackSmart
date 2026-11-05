@@ -39,6 +39,13 @@ def _sample_plan() -> PersonalizedPlanResult:
     )
 
 
+def _sample_advice():
+    plan = ai_financial_planner._attach_rule_based_advisor_fields(
+        _sample_plan(), PersonalizedPlanRequest(monthly_investment_amount=500)
+    )
+    return ai_financial_planner.AdvisorResponse.model_validate(plan.model_dump()).model_dump_json()
+
+
 def test_generate_ai_financial_plan_falls_back_when_disabled(monkeypatch):
     monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "false")
     monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
@@ -60,18 +67,22 @@ def test_generate_ai_financial_plan_raises_without_key_when_enabled(monkeypatch)
 def openrouter_setup(monkeypatch):
     monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "true")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.delenv("OPENROUTER_FALLBACK_MODEL", raising=False)
     monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
 
 
-@pytest.mark.parametrize("fenced", [False, True])
-def test_openrouter_request_and_validated_response(monkeypatch, openrouter_setup, fenced):
+@pytest.mark.parametrize("format", ["json", "fenced", "tool"])
+def test_openrouter_request_and_validated_response(monkeypatch, openrouter_setup, format):
     captured = {}
-    content = _sample_plan().model_dump_json()
-    if fenced:
+    content = _sample_advice()
+    if format == "fenced":
         content = "```json\n" + content + "\n```"
     def post(url, **kwargs):
         captured.update(url=url, **kwargs)
-        return SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": content}}]})
+        message = {"content": content}
+        if format == "tool":
+            message = {"tool_calls": [{"function": {"name": "submit_financial_advice", "arguments": content}}]}
+        return SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "tool_calls" if format == "tool" else "stop", "message": message}]})
     monkeypatch.setattr(ai_financial_planner.requests, "post", post)
     result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
     assert result.plan_source == "ai"
@@ -80,8 +91,12 @@ def test_openrouter_request_and_validated_response(monkeypatch, openrouter_setup
     assert captured["json"]["model"] == ai_financial_planner.DEFAULT_AI_MODEL
     assert captured["json"]["provider"]["max_price"] == {"prompt": 0, "completion": 0}
     assert "models" not in captured["json"]
-    assert "OUTPUT_JSON_SCHEMA" in captured["json"]["messages"][1]["content"]
-    assert captured["timeout"] == (10, 120)
+    assert captured["json"]["tool_choice"]["function"]["name"] == "submit_financial_advice"
+    assert captured["json"]["reasoning"] == {"enabled": False}
+    assert captured["json"]["tools"][0]["function"]["parameters"]["required"]
+    assert result.target_allocation == _sample_plan().target_allocation
+    assert result.projected_value_30yr == _sample_plan().projected_value_30yr
+    assert captured["timeout"] == (10, 45)
 
 
 @pytest.mark.parametrize("body", [
@@ -101,7 +116,7 @@ def test_invalid_provider_response_raises(monkeypatch, openrouter_setup, body):
 @pytest.mark.parametrize("status", [401, 429, 503])
 def test_provider_http_errors_do_not_expose_body(monkeypatch, openrouter_setup, status):
     monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=False, status_code=status, text="secret provider details"))
-    with pytest.raises(RuntimeError, match=f"HTTP {status}") as error:
+    with pytest.raises(RuntimeError, match="rate-limited" if status == 429 else f"HTTP {status}") as error:
         generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
     assert "secret" not in str(error.value)
 
@@ -110,7 +125,7 @@ def test_provider_timeout_raises(monkeypatch, openrouter_setup):
     def post(*args, **kwargs):
         raise ai_financial_planner.requests.Timeout("secret request details")
     monkeypatch.setattr(ai_financial_planner.requests, "post", post)
-    with pytest.raises(RuntimeError, match="OpenRouter request failed") as error:
+    with pytest.raises(RuntimeError, match="took too long") as error:
         generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
     assert "secret" not in str(error.value)
 
@@ -214,17 +229,16 @@ def test_ai_disabled_returns_rule_based_dashboard_fields(monkeypatch):
     assert "rule-based" in " ".join(result.warnings or []).lower()
 
 
-def test_ai_prompt_requires_advisor_dashboard_sections():
-    from pathlib import Path
-
-    source = Path("app/services/ai_financial_planner.py").read_text()
-
-    assert "6 to 8 prioritized advisor cards" in source
-    assert "investing and ETF allocation first" in source
-    assert "debt and emergency fund guidance" in source
-    assert "satellite stock ideas" in source
-    assert "monthly_action_plan only when" in source
-    assert "advisor_assumptions" in source
+def test_ai_prompt_contains_financial_context_without_requiring_calculation_output():
+    request = PersonalizedPlanRequest(monthly_investment_amount=300, notes="Synthetic goal", monthly_expenses=1000)
+    payload = ai_financial_planner._request_payload(request, _sample_plan())
+    assert payload["user_inputs"]["monthly_investment_amount"] == 300
+    assert payload["user_inputs"]["notes"] == "Synthetic goal"
+    assert "allocation" in payload["deterministic_baseline"]
+    assert "projected_value_30yr" not in payload["deterministic_baseline"]
+    schema = ai_financial_planner.AdvisorResponse.model_json_schema()
+    assert "target_allocation" not in schema["properties"]
+    assert schema["properties"]["advisor_cards"]["minItems"] == 6
 
 
 def test_sanitize_ai_plan_sets_source_and_limits_satellite_stock_exposure():
@@ -305,3 +319,50 @@ def test_zero_market_returns_are_preserved(monkeypatch):
     })
     plan = personalized_planner.generate_personalized_plan(PersonalizedPlanRequest(monthly_investment_amount=300))
     assert all(etf.ytd_return == 0 and etf.one_year_return == 0 and etf.expense_ratio == 0 for etf in plan.target_allocation)
+
+
+@pytest.mark.parametrize("bad_amount", [-1, 501, float("inf")])
+def test_ai_advice_rejects_invalid_monthly_budget(monkeypatch, openrouter_setup, bad_amount):
+    import json
+    advice = json.loads(_sample_advice())
+    advice["monthly_action_plan"] = {"etf_investing_amount": bad_amount, "debt_extra_payment_amount": 0, "emergency_fund_amount": 0}
+    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(advice)}}]}))
+    with pytest.raises(ai_financial_planner.AIPlanError, match="invalid or incomplete"):
+        generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, monthly_expenses=1000))
+
+
+@pytest.mark.parametrize("failure", ["timeout", "invalid"])
+def test_free_fallback_uses_correct_request_and_preserves_calculations(monkeypatch, openrouter_setup, failure):
+    monkeypatch.setenv("OPENROUTER_FALLBACK_MODEL", "openrouter/free")
+    calls = []
+    def post(url, **kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            if failure == "timeout":
+                raise ai_financial_planner.requests.Timeout()
+            return SimpleNamespace(ok=True, json=lambda: {"choices": []})
+        return SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": _sample_advice()}}]})
+    monkeypatch.setattr(ai_financial_planner.requests, "post", post)
+    plan = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    assert calls[0]["json"]["model"] == ai_financial_planner.DEFAULT_AI_MODEL
+    assert calls[0]["timeout"] == (10, 20)
+    assert calls[1]["json"]["model"] == "openrouter/free"
+    assert calls[1]["timeout"] == (10, 40)
+    assert "reasoning" not in calls[1]["json"]
+    assert calls[1]["json"]["provider"]["max_price"] == {"prompt": 0, "completion": 0}
+    assert plan.ai_model == "openrouter/free"
+    assert plan.target_allocation == _sample_plan().target_allocation
+    assert any("free fallback" in warning for warning in plan.warnings)
+
+
+def test_monthly_advice_keeps_portfolio_dollars_and_projections_consistent(monkeypatch, openrouter_setup):
+    import json
+    advice = json.loads(_sample_advice())
+    advice["monthly_action_plan"] = {"etf_investing_amount": 200, "debt_extra_payment_amount": 250, "emergency_fund_amount": 50}
+    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(advice)}}]}))
+    result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, monthly_expenses=1000))
+    assert sum(etf.monthly_amount for etf in result.target_allocation) == 200
+    assert result.monthly_investment_breakdown == {"VOO": 200}
+    assert result.monthly_action_plan.available_monthly_amount == 500
+    expected = ai_financial_planner.personalized_planner.calculate_future_value(0, 200, 0.08, 30)
+    assert result.projected_value_30yr == round(expected, 2)

@@ -52,8 +52,19 @@ export async function optimizeFinancialPath(
   return response.json();
 }
 
+async function planningFetch(url: string, options: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, { ...options, signal: AbortSignal.timeout(90000) });
+  } catch (error) {
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
+      throw new Error('Plan generation took too long. Please try again shortly.');
+    }
+    throw new Error('Unable to connect to StackSmart. Check your connection and try again shortly.');
+  }
+}
+
 export async function fetchPlanGenerationStatus(accessToken: string) {
-  const response = await fetch(`${API_BASE_URL}/api/plan/generate/status`, {
+  const response = await planningFetch(`${API_BASE_URL}/api/plan/generate/status`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
@@ -67,7 +78,7 @@ export async function fetchPlanGenerationStatus(accessToken: string) {
 }
 
 export async function generatePersonalizedPlan(payload: unknown, accessToken: string) {
-  const response = await fetch(`${API_BASE_URL}/api/plan/generate`, {
+  const response = await planningFetch(`${API_BASE_URL}/api/plan/generate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
