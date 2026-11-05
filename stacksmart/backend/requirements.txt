@@ -10,6 +10,5 @@ yfinance==0.2.58
 supabase>=2.6.0
 pandas_market_calendars>=4.4.0
 websockets>=13,<17
-google-genai>=1.0.0
 pytest>=8.3.0
 pytest-mock>=3.14.0

@@ -4,8 +4,7 @@ import json
 import os
 from typing import Any
 
-from google import genai
-from pydantic import ValidationError
+import requests
 
 from app.models.schemas import (
     AdvisorAssumptions,
@@ -16,9 +15,8 @@ from app.models.schemas import (
 )
 from app.services import personalized_planner
 
-# Model is env-configurable; default documents the current Flash model at
-# implementation time. The exact default can be bumped via GEMINI_MODEL.
-DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+DEFAULT_AI_MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-ultra-550b-a55b:free")
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 SYSTEM_INSTRUCTIONS = """
 You are StackSmart's financial advisor-style planning assistant. Produce educational, general financial planning guidance, not professional financial, tax, or legal advice.
@@ -51,7 +49,7 @@ def _request_payload(request: PersonalizedPlanRequest, baseline: PersonalizedPla
 
 
 def _sanitize_plan(plan: PersonalizedPlanResult, baseline: PersonalizedPlanResult) -> PersonalizedPlanResult:
-    """Clamp obvious model mistakes while keeping Gemini's useful wording."""
+    """Clamp obvious model mistakes while keeping the AI provider's useful wording."""
     plan.plan_source = "ai"
 
     fallback_cards = [
@@ -60,7 +58,7 @@ def _sanitize_plan(plan: PersonalizedPlanResult, baseline: PersonalizedPlanResul
             priority=1,
             category="investing",
             recommendation="Use the ETF allocation below as the core of the plan.",
-            rationale="Gemini returned a valid portfolio plan, but StackSmart added this dashboard guardrail for clarity.",
+            rationale="The AI provider returned a valid portfolio plan, but StackSmart added this dashboard guardrail for clarity.",
             action_items=["Review the allocation", "Verify this plan before acting"],
             confidence="low",
         ),
@@ -184,7 +182,7 @@ def _fallback_monthly_action_plan(request: PersonalizedPlanRequest) -> MonthlyAc
         etf_investing_amount=round(etf_amount, 2),
         debt_extra_payment_amount=round(debt_amount, 2),
         emergency_fund_amount=round(emergency_amount, 2),
-        notes=["Rule-based allocation because Gemini was unavailable or disabled."],
+        notes=["Rule-based allocation because the AI provider was unavailable or disabled."],
     )
 
 
@@ -272,20 +270,21 @@ def _attach_rule_based_advisor_fields(plan: PersonalizedPlanResult, request: Per
             "loans": not request.loans,
             "tax filing status": request.tax_filing_status is None,
         }.items() if missing],
-        caveats=["Fallback dashboard is rule-based and less adaptive than Gemini."],
+        caveats=["Fallback dashboard is rule-based and less adaptive than the AI provider."],
     )
     return plan
 
 
 def generate_ai_financial_plan(request: PersonalizedPlanRequest) -> PersonalizedPlanResult:
-    """Build a deterministic baseline, then ask Gemini to refine it.
+    """Build a deterministic baseline, then ask the AI provider to refine it.
 
-    Falls back to the deterministic baseline when AI is disabled or when no
-    API key is configured, so the endpoint always returns a usable plan.
+    Falls back to the deterministic baseline when AI is disabled.
+    Provider failures are surfaced so the endpoint can
+    release the reserved daily generation slot.
     """
     baseline = personalized_planner.generate_personalized_plan(request)
 
-    ai_enabled = os.getenv("ENABLE_GEMINI_FINANCIAL_PLANS", "false").lower() == "true"
+    ai_enabled = os.getenv("ENABLE_AI_FINANCIAL_PLANS", "false").lower() == "true"
     if not ai_enabled:
         baseline = _attach_rule_based_advisor_fields(baseline, request)
         baseline.warnings = list(baseline.warnings or []) + [
@@ -293,11 +292,10 @@ def generate_ai_financial_plan(request: PersonalizedPlanRequest) -> Personalized
         ]
         return baseline
 
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        raise RuntimeError("GEMINI_API_KEY is not configured")
+        raise RuntimeError("OPENROUTER_API_KEY is not configured")
 
-    client = genai.Client(api_key=api_key)
     payload = _request_payload(request, baseline)
     schema = PersonalizedPlanResult.model_json_schema()
     prompt = (
@@ -308,18 +306,41 @@ def generate_ai_financial_plan(request: PersonalizedPlanRequest) -> Personalized
         f"INPUT_JSON:\n{json.dumps(payload, separators=(',', ':'))}"
     )
 
-    response = client.models.generate_content(
-        model=DEFAULT_GEMINI_MODEL,
-        contents=prompt,
-        config=genai.types.GenerateContentConfig(
-            response_mime_type="application/json",
-            system_instruction=SYSTEM_INSTRUCTIONS,
-        ),
-    )
-
+    # Keep the selected model explicit: never fall back to a paid model.
     try:
-        ai_plan = PersonalizedPlanResult.model_validate_json(response.text)
-    except ValidationError:
-        raise
+        response = requests.post(
+            OPENROUTER_URL,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": DEFAULT_AI_MODEL,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_INSTRUCTIONS},
+                    {"role": "user", "content": prompt},
+                ],
+                "max_tokens": 12000,
+                "provider": {"max_price": {"prompt": 0, "completion": 0}},
+            },
+            timeout=(10, 120),
+        )
+    except requests.RequestException:
+        raise RuntimeError("OpenRouter request failed; please try again later") from None
+    if not response.ok:
+        # Never include provider bodies or request headers in application logs.
+        raise RuntimeError(f"OpenRouter request failed (HTTP {response.status_code})")
+    try:
+        body = response.json()
+        choice = body["choices"][0]
+        if choice.get("finish_reason") != "stop":
+            raise ValueError("Incomplete response")
+        content = choice["message"]["content"]
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("Empty response")
+        # Some free models wrap JSON in a Markdown code fence.
+        content = content.strip()
+        if content.startswith("```") and content.endswith("```"):
+            content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        ai_plan = PersonalizedPlanResult.model_validate_json(content)
+    except (ValueError, KeyError, IndexError, TypeError):
+        raise RuntimeError("OpenRouter returned an invalid or incomplete financial plan") from None
 
     return _sanitize_plan(ai_plan, baseline)

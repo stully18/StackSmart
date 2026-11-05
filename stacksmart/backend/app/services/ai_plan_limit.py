@@ -78,7 +78,7 @@ async def reserve_daily_generation(user_id: str, model: str, request_payload: di
             "generated_on": today_utc(),
             "generation_number": generation_number,
             "status": "pending",
-            "provider": "gemini",
+            "provider": "openrouter",
             "model": model,
             "request_payload": request_payload,
         }

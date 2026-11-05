@@ -156,7 +156,7 @@ export interface MultiLoanResult {
 
 // ============= AI Advisor Dashboard Types =============
 // Mirror the richer advisor-dashboard payload that the backend can return
-// (Gemini-backed or rule-based fallback). The page renders these sections
+// (OpenRouter-backed or rule-based fallback). The page renders these sections
 // above the existing ETF allocation / projection sections.
 
 export type AdvisorCardCategory =

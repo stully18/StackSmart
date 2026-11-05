@@ -24,8 +24,8 @@ describe('InvestmentPlanPage auto-generation behavior', () => {
     expect(source).toContain("risk_tolerance: ''");
     expect(source).toContain("financial_goal: ''");
     expect(source).toContain('has_emergency_fund: false');
-    expect(source).toContain('Select risk tolerance');
-    expect(source).toContain('Select primary goal');
+    expect(source).toContain('How much risk feels right?');
+    expect(source).toContain('What are you working toward?');
 
     expect(source).not.toContain('monthly_investment_amount: financialData.monthlyBudget');
     expect(source).not.toContain('current_savings: financialData.currentSavings');

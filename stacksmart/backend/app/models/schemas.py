@@ -158,7 +158,7 @@ class MonthlyActionPlan(BaseModel):
 class SatelliteStockIdea(BaseModel):
     ticker: str
     name: str
-    # Note: no upper bound here on purpose. Gemini may return >10; the
+    # Note: no upper bound here on purpose. The AI model may return >10; the
     # sanitizer clamps each idea down to <=10% so over-allocated output
     # never fails validation before it can be corrected.
     allocation_percent: float = Field(..., ge=0)

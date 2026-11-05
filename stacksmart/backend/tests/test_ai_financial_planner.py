@@ -1,4 +1,6 @@
-import os
+from types import SimpleNamespace
+
+import pytest
 
 from app.models.schemas import ETFAllocation, FinancialGoal, PersonalizedPlanRequest, PersonalizedPlanResult, RiskTolerance
 from app.services import ai_financial_planner
@@ -38,100 +40,79 @@ def _sample_plan() -> PersonalizedPlanResult:
 
 
 def test_generate_ai_financial_plan_falls_back_when_disabled(monkeypatch):
-    """With ENABLE_GEMINI_FINANCIAL_PLANS=false the service returns the
-    deterministic baseline plus a disabled notice, and NEVER calls Gemini."""
-    monkeypatch.setenv("ENABLE_GEMINI_FINANCIAL_PLANS", "false")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    # Guard: if the service tried to call Gemini it would need a client/network.
-    called = {"gemini": False}
-
-    def fake_genai_client(*args, **kwargs):
-        called["gemini"] = True
-        raise AssertionError("Gemini must not be called when AI is disabled")
-
-    monkeypatch.setattr(ai_financial_planner.genai, "Client", fake_genai_client)
-
-    request = PersonalizedPlanRequest(
-        monthly_investment_amount=500,
-        risk_tolerance=RiskTolerance.MODERATE,
-        financial_goal=FinancialGoal.WEALTH_BUILDING,
-        time_horizon_years=10,
-        current_savings=1000,
-        has_emergency_fund=True,
-        loans=[
-            {
-                "loan_type": "credit_card",
-                "loan_name": "Visa",
-                "principal": 5000,
-                "interest_rate": 0.22,
-                "minimum_payment": 150,
-            }
-        ],
-        age=30,
-        notes="Aggressive saver",
-    )
-
-    plan = generate_ai_financial_plan(request)
-
-    assert not called["gemini"]
-    assert plan.portfolio_name
-    assert plan.target_allocation
-    assert any(
-        "AI plan generation is disabled" in warning for warning in (plan.warnings or [])
-    )
+    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "false")
+    monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
+    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: pytest.fail("AI disabled: no provider call expected"))
+    result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    assert result.plan_source == "rule_based"
+    assert any("AI plan generation is disabled" in warning for warning in result.warnings)
 
 
 def test_generate_ai_financial_plan_raises_without_key_when_enabled(monkeypatch):
-    """When AI is enabled but no key is configured, the service surfaces a
-    clear runtime error rather than silently falling back."""
-    monkeypatch.setenv("ENABLE_GEMINI_FINANCIAL_PLANS", "true")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-
-    request = PersonalizedPlanRequest(monthly_investment_amount=500)
-
-    try:
-        generate_ai_financial_plan(request)
-        assert False, "expected RuntimeError for missing GEMINI_API_KEY"
-    except RuntimeError as exc:
-        assert "GEMINI_API_KEY" in str(exc)
+    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "true")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
+    with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
+        generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
 
 
-def test_generate_ai_financial_plan_uses_json_mode_without_developer_api_schema(monkeypatch):
-    """Gemini Developer API rejects Pydantic dict schemas because they emit
-    additionalProperties. Keep JSON mode, put the schema in the prompt, and
-    do not send response_schema in GenerateContentConfig."""
-    baseline = _sample_plan()
+@pytest.fixture
+def openrouter_setup(monkeypatch):
+    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "true")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
+
+
+@pytest.mark.parametrize("fenced", [False, True])
+def test_openrouter_request_and_validated_response(monkeypatch, openrouter_setup, fenced):
     captured = {}
+    content = _sample_plan().model_dump_json()
+    if fenced:
+        content = "```json\n" + content + "\n```"
+    def post(url, **kwargs):
+        captured.update(url=url, **kwargs)
+        return SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": content}}]})
+    monkeypatch.setattr(ai_financial_planner.requests, "post", post)
+    result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    assert result.plan_source == "ai"
+    assert captured["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert captured["headers"]["Authorization"] == "Bearer test-key"
+    assert captured["json"]["model"] == ai_financial_planner.DEFAULT_AI_MODEL
+    assert captured["json"]["provider"]["max_price"] == {"prompt": 0, "completion": 0}
+    assert "models" not in captured["json"]
+    assert "OUTPUT_JSON_SCHEMA" in captured["json"]["messages"][1]["content"]
+    assert captured["timeout"] == (10, 120)
 
-    class FakeModels:
-        def generate_content(self, *, model, contents, config):
-            captured["model"] = model
-            captured["contents"] = contents
-            captured["config"] = config
 
-            class FakeResponse:
-                text = baseline.model_dump_json()
+@pytest.mark.parametrize("body", [
+    {"error": {"message": "provider failure"}},
+    {"choices": []},
+    {"choices": [{"finish_reason": "length", "message": {"content": "{}"}}]},
+    {"choices": [{"finish_reason": "stop", "message": {"content": None}}]},
+    {"choices": [{"finish_reason": "stop", "message": {"content": "not JSON"}}]},
+    {"choices": [{"finish_reason": "stop", "message": {"content": "{}"}}]},
+])
+def test_invalid_provider_response_raises(monkeypatch, openrouter_setup, body):
+    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=True, json=lambda: body))
+    with pytest.raises(RuntimeError, match="invalid or incomplete"):
+        generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
 
-            return FakeResponse()
 
-    class FakeClient:
-        def __init__(self, *, api_key):
-            captured["api_key"] = api_key
-            self.models = FakeModels()
+@pytest.mark.parametrize("status", [401, 429, 503])
+def test_provider_http_errors_do_not_expose_body(monkeypatch, openrouter_setup, status):
+    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=False, status_code=status, text="secret provider details"))
+    with pytest.raises(RuntimeError, match=f"HTTP {status}") as error:
+        generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    assert "secret" not in str(error.value)
 
-    monkeypatch.setenv("ENABLE_GEMINI_FINANCIAL_PLANS", "true")
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
-    monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: baseline)
-    monkeypatch.setattr(ai_financial_planner.genai, "Client", FakeClient)
 
-    plan = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
-
-    assert plan.portfolio_name == "Mock Portfolio"
-    assert captured["api_key"] == "test-key"
-    assert "OUTPUT_JSON_SCHEMA" in captured["contents"]
-    assert "INPUT_JSON" in captured["contents"]
-    assert getattr(captured["config"], "response_mime_type") == "application/json"
-    assert getattr(captured["config"], "response_schema", None) is None
+def test_provider_timeout_raises(monkeypatch, openrouter_setup):
+    def post(*args, **kwargs):
+        raise ai_financial_planner.requests.Timeout("secret request details")
+    monkeypatch.setattr(ai_financial_planner.requests, "post", post)
+    with pytest.raises(RuntimeError, match="OpenRouter request failed") as error:
+        generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    assert "secret" not in str(error.value)
 
 
 def test_personalized_plan_result_accepts_advisor_dashboard_fields():
@@ -206,7 +187,8 @@ def test_ai_disabled_returns_rule_based_dashboard_fields(monkeypatch):
     from app.models.schemas import FinancialGoal, PersonalizedPlanRequest, RiskTolerance
     from app.services.ai_financial_planner import generate_ai_financial_plan
 
-    monkeypatch.setenv("ENABLE_GEMINI_FINANCIAL_PLANS", "false")
+    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "false")
+    monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
 
     request = PersonalizedPlanRequest(
         monthly_investment_amount=1000,

@@ -167,7 +167,7 @@ export default function InvestmentPlanPage() {
       !formData.risk_tolerance ||
       !formData.financial_goal
     ) {
-      setError('Please complete the investment amount, savings, risk tolerance, and goal before generating a plan.');
+      setError('Enter a monthly amount, then choose your risk tolerance and goal.');
       return;
     }
 
@@ -181,7 +181,7 @@ export default function InvestmentPlanPage() {
     }
 
     if (generationStatus?.used_today) {
-      setError('You already generated your AI plan today. Please come back tomorrow.');
+      setError('You reached your daily AI plan limit. Please come back tomorrow.');
       setLoading(false);
       return;
     }
@@ -294,142 +294,95 @@ export default function InvestmentPlanPage() {
         )}
 
         {/* Input Form */}
-        <form onSubmit={handleSubmit} className="bg-surface border border-border-subtle rounded-xl p-6 mb-8 space-y-8">
+        <form onSubmit={handleSubmit} className="bg-surface border border-border-subtle rounded-xl p-6 mb-8 space-y-8 [color-scheme:dark]">
 
-          {/* Section 1: Investment Amount */}
           <div>
-            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Investment Amount</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">
-                  Monthly Amount to Invest
-                  <span className="block text-xs text-text-muted/70 font-normal">After bills, expenses &amp; emergency fund</span>
+            <h2 className="text-xl font-semibold text-text-primary">Start with the essentials</h2>
+            <p className="text-sm text-text-secondary mt-1">Three quick choices. Add more detail only if you want to.</p>
+          </div>
+
+          <div className="max-w-sm">
+            <label htmlFor="monthly-investment" className="block text-sm font-medium text-text-secondary mb-2">How much can you invest each month?</label>
+            <div className="relative">
+              <span className="absolute left-4 top-3 text-text-muted" aria-hidden="true">$</span>
+              <input id="monthly-investment" type="number" name="monthly_investment_amount" value={formData.monthly_investment_amount} onChange={handleChange} min="1" step="1" placeholder="e.g. 500" required className="w-full pl-9 pr-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/20" />
+            </div>
+            <p className="text-xs text-text-secondary mt-2">Use the amount left after bills and essential expenses.</p>
+          </div>
+
+          <fieldset>
+            <legend className="text-sm font-medium text-text-secondary mb-3">How much risk feels right?</legend>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { value: 'conservative', title: 'Conservative', detail: 'More stability, gentler growth' },
+                { value: 'moderate', title: 'Moderate', detail: 'A balance of growth and stability' },
+                { value: 'aggressive', title: 'Aggressive', detail: 'More growth potential, bigger swings' },
+              ].map(option => (
+                <label key={option.value} className="relative cursor-pointer">
+                  <input type="radio" name="risk_tolerance" value={option.value} checked={formData.risk_tolerance === option.value} onChange={handleChange} required className="peer sr-only" />
+                  <span className="block h-full rounded-xl border border-border bg-surface-elevated/40 p-4 transition-colors hover:border-primary/50 peer-checked:border-primary peer-checked:bg-primary/10 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-surface">
+                    <span className="block font-medium text-text-primary">{option.title}</span>
+                    <span className="block text-xs text-text-secondary mt-1">{option.detail}</span>
+                  </span>
                 </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-3 text-text-muted">$</span>
-                  <input
-                    type="number"
-                    name="monthly_investment_amount"
-                    value={formData.monthly_investment_amount}
-                    onChange={handleChange}
-                    min="1"
-                    step="1"
-                    placeholder="e.g. 500"
-                    className="w-full pl-8 pr-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
-                    required
-                  />
+              ))}
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend className="text-sm font-medium text-text-secondary mb-3">What are you working toward?</legend>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { value: 'wealth_building', title: 'Build wealth', detail: 'Grow my money over time' },
+                { value: 'income_generation', title: 'Create income', detail: 'Build an income stream' },
+                { value: 'capital_preservation', title: 'Protect savings', detail: 'Focus on preserving value' },
+                { value: 'debt_freedom', title: 'Get debt-free', detail: 'Balance investing with debt payoff' },
+              ].map(option => (
+                <label key={option.value} className="relative cursor-pointer">
+                  <input type="radio" name="financial_goal" value={option.value} checked={formData.financial_goal === option.value} onChange={handleChange} required className="peer sr-only" />
+                  <span className="block h-full rounded-xl border border-border bg-surface-elevated/40 p-4 transition-colors hover:border-primary/50 peer-checked:border-primary peer-checked:bg-primary/10 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-surface">
+                    <span className="block font-medium text-text-primary">{option.title}</span>
+                    <span className="block text-xs text-text-secondary mt-1">{option.detail}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <details className="group border-t border-border pt-5">
+            <summary className="cursor-pointer text-sm font-medium text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded">
+              Personalize further <span className="text-text-secondary font-normal">(optional)</span>
+            </summary>
+            <p className="text-sm text-text-secondary mt-3 mb-5">Skip this for a starting plan. Savings default to $0 and projections use a 10-year horizon. Emergency savings are not assumed.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[
+                { name: 'current_savings', label: 'Current investment savings ($)', min: 0, max: undefined, placeholder: '0' },
+                { name: 'monthly_gross_income', label: 'Monthly income before tax ($)', min: 0, max: undefined, placeholder: 'e.g. 5000' },
+                { name: 'monthly_expenses', label: 'Monthly expenses ($)', min: 0, max: undefined, placeholder: 'e.g. 2500' },
+                { name: 'current_emergency_fund', label: 'Emergency savings ($)', min: 0, max: undefined, placeholder: '0' },
+                { name: 'emergency_fund_months_target', label: 'Emergency fund target (months)', min: 1, max: 12, placeholder: '3' },
+                { name: 'age', label: 'Age', min: 13, max: 100, placeholder: 'e.g. 25' },
+              ].map(field => (
+                <div key={field.name}>
+                  <label htmlFor={field.name} className="block text-sm font-medium text-text-secondary mb-2">{field.label}</label>
+                  <input id={field.name} type="number" name={field.name} value={formData[field.name as keyof InvestmentPlanFormData] as number | ''} onChange={handleChange} min={field.min} max={field.max} step="1" placeholder={field.placeholder} className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/20" />
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Current Investment Savings</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-3 text-text-muted">$</span>
-                  <input
-                    type="number"
-                    name="current_savings"
-                    value={formData.current_savings}
-                    onChange={handleChange}
-                    min="0"
-                    step="1"
-                    placeholder="0"
-                    className="w-full pl-8 pr-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="flex items-center pt-7">
-                <input
-                  type="checkbox"
-                  name="has_emergency_fund"
-                  checked={formData.has_emergency_fund}
-                  onChange={handleChange}
-                  className="w-5 h-5 bg-surface-elevated border border-border rounded text-primary focus:ring-2 focus:ring-primary/20"
-                />
-                <label className="ml-3 text-sm font-medium text-text-secondary">
-                  I have an emergency fund
-                  <span className="block text-xs text-text-muted/70">3–6 months of expenses saved</span>
-                </label>
-              </div>
+              ))}
             </div>
-          </div>
-
-          <div className="border-t border-border-subtle" />
-
-          {/* Section 2: Goals & Preferences */}
-          <div>
-            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Goals &amp; Preferences</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Risk Tolerance</label>
-                <select
-                  name="risk_tolerance"
-                  value={formData.risk_tolerance}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
-                  required
-                >
-                  <option value="" disabled>Select risk tolerance</option>
-                  <option value="conservative">Conservative</option>
-                  <option value="moderate">Moderate</option>
-                  <option value="aggressive">Aggressive</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Primary Goal</label>
-                <select
-                  name="financial_goal"
-                  value={formData.financial_goal}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
-                  required
-                >
-                  <option value="" disabled>Select primary goal</option>
-                  <option value="wealth_building">Wealth Building</option>
-                  <option value="income_generation">Income Generation</option>
-                  <option value="capital_preservation">Capital Preservation</option>
-                  <option value="debt_freedom">Debt Freedom</option>
-                </select>
-              </div>
-              <div className="flex items-center pt-7">
-                <input
-                  type="checkbox"
-                  name="include_roth_ira"
-                  checked={formData.include_roth_ira}
-                  onChange={handleChange}
-                  className="w-5 h-5 bg-surface-elevated border border-border rounded text-primary focus:ring-2 focus:ring-primary/20"
-                />
-                <label className="ml-3 text-sm font-medium text-text-secondary">
-                  Include Roth IRA
-                  <span className="block text-xs text-text-muted/70">Up to $583/mo ($7k/yr)</span>
-                </label>
-              </div>
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 my-5">
+              <label className="flex items-center gap-3 text-sm text-text-secondary">
+                <input type="checkbox" name="has_emergency_fund" checked={formData.has_emergency_fund} onChange={handleChange} className="w-5 h-5 accent-primary" />
+                I have 3 to 6 months of emergency savings
+              </label>
+              <label className="flex items-center gap-3 text-sm text-text-secondary">
+                <input type="checkbox" name="include_roth_ira" checked={formData.include_roth_ira} onChange={handleChange} className="w-5 h-5 accent-primary" />
+                Include a Roth IRA in my plan
+              </label>
             </div>
-          </div>
-
-          <div className="border-t border-border-subtle" />
-          <div>
-            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-4">Advisor Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <input type="number" name="monthly_gross_income" value={formData.monthly_gross_income} onChange={handleChange} min="0" step="1" placeholder="Monthly gross income" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
-              <input type="number" name="monthly_expenses" value={formData.monthly_expenses} onChange={handleChange} min="0" step="1" placeholder="Monthly expenses" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
-              <input type="number" name="current_emergency_fund" value={formData.current_emergency_fund} onChange={handleChange} min="0" step="1" placeholder="Emergency fund saved" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
-              <input type="number" name="emergency_fund_months_target" value={formData.emergency_fund_months_target} onChange={handleChange} min="1" max="12" step="1" placeholder="Emergency fund months target" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
-              <input type="number" name="age" value={formData.age} onChange={handleChange} min="13" max="100" step="1" placeholder="Age" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70" />
-              <div className="md:col-span-3">
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  maxLength={1000}
-                  placeholder="Any future goals or anything the AI Advisor should know?"
-                  className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted/70 min-h-24"
-                />
-              </div>
-            </div>
-            <p className="text-xs text-text-muted/70 mt-3">
-              {loans.length} saved loan{loans.length === 1 ? '' : 's'} included from Debt Optimizer.
-            </p>
-          </div>
+            <label htmlFor="planning-notes" className="block text-sm font-medium text-text-secondary mb-2">Anything else to consider?</label>
+            <textarea id="planning-notes" name="notes" value={formData.notes} onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))} maxLength={1000} placeholder="Any future goals or anything the AI Advisor should know?" className="w-full px-4 py-3 bg-surface-elevated/60 border border-border rounded-lg text-text-primary placeholder-text-muted min-h-24 focus:border-primary focus:ring-1 focus:ring-primary/20" />
+          </details>
+          <p className="text-xs text-text-secondary">{loans.length} saved loan{loans.length === 1 ? '' : 's'} included from Debt Optimizer.</p>
 
           <button
             type="submit"

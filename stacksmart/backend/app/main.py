@@ -599,14 +599,14 @@ async def generate_financial_plan(
     user_id: str = Depends(verify_user_token),
 ):
     """
-    Generate one AI-assisted personalized investment plan per user per UTC day.
+    Generate an AI-assisted plan within the per-user UTC-day limit.
 
     Requires a Supabase bearer token. Enforces the daily generation limit
     server-side via the ai_plan_generations table, reserves a slot before
-    calling Gemini, and releases it if generation fails so provider errors
-    do not consume the user's one daily attempt.
+    calling OpenRouter, and releases it if generation fails so provider errors
+    do not consume the user's daily quota.
     """
-    model = ai_financial_planner.DEFAULT_GEMINI_MODEL
+    model = ai_financial_planner.DEFAULT_AI_MODEL
     generation_id = None
     try:
         generation_id = await reserve_daily_generation(

@@ -36,7 +36,7 @@ def test_reserve_creates_row_with_user_and_today(patched_supabase):
     generation_id = asyncio.run(
         reserve_daily_generation(
             user_id="user-123",
-            model="gemini-2.0-flash",
+            model="nvidia/nemotron-3-ultra-550b-a55b:free",
             request_payload={"monthly_investment_amount": 500},
         )
     )
@@ -48,8 +48,8 @@ def test_reserve_creates_row_with_user_and_today(patched_supabase):
     assert row["user_id"] == "user-123"
     assert row["generated_on"] == today_utc()
     assert row["status"] == "pending"
-    assert row["provider"] == "gemini"
-    assert row["model"] == "gemini-2.0-flash"
+    assert row["provider"] == "openrouter"
+    assert row["model"] == "nvidia/nemotron-3-ultra-550b-a55b:free"
     assert row["generation_number"] == 1
     assert row["request_payload"] == {"monthly_investment_amount": 500}
     # id must be present and equal the returned id
@@ -64,7 +64,7 @@ def test_reserve_uses_next_available_generation_slot(patched_supabase):
 
     asyncio.run(
         reserve_daily_generation(
-            user_id="user-123", model="gemini-2.0-flash", request_payload={}
+            user_id="user-123", model="nvidia/nemotron-3-ultra-550b-a55b:free", request_payload={}
         )
     )
 
@@ -81,21 +81,21 @@ def test_reserve_raises_daily_limit_exceeded_at_ten_generations(patched_supabase
     with pytest.raises(DailyPlanLimitExceeded) as exc_info:
         asyncio.run(
             reserve_daily_generation(
-                user_id="user-123", model="gemini-2.0-flash", request_payload={}
+                user_id="user-123", model="nvidia/nemotron-3-ultra-550b-a55b:free", request_payload={}
             )
         )
     assert "10 ai plans" in str(exc_info.value).lower()
 
 
 def test_reserve_duplicate_key_retries_next_slot(patched_supabase):
-    from conftest import make_api_error
+    from tests.conftest import make_api_error
 
     patched_supabase.set_insert_error(make_api_error())
 
     with pytest.raises(DailyPlanLimitExceeded) as exc_info:
         asyncio.run(
             reserve_daily_generation(
-                user_id="user-123", model="gemini-2.0-flash", request_payload={}
+                user_id="user-123", model="nvidia/nemotron-3-ultra-550b-a55b:free", request_payload={}
             )
         )
     assert "10 ai plans" in str(exc_info.value).lower()
@@ -111,7 +111,7 @@ def test_reserve_other_api_error_is_reraised(patched_supabase):
     with pytest.raises(APIError):
         asyncio.run(
             reserve_daily_generation(
-                user_id="user-123", model="gemini-2.0-flash", request_payload={}
+                user_id="user-123", model="nvidia/nemotron-3-ultra-550b-a55b:free", request_payload={}
             )
         )
 
@@ -160,8 +160,8 @@ def test_get_today_generation_returns_single_row(patched_supabase):
                 "id": "gen-1",
                 "generated_on": today_utc(),
                 "status": "completed",
-                "provider": "gemini",
-                "model": "gemini-2.0-flash",
+                "provider": "openrouter",
+                "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
                 "generation_number": 1,
                 "created_at": "2026-01-01T00:00:00Z",
                 "completed_at": "2026-01-01T00:01:00Z",
