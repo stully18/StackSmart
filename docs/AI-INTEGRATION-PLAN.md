@@ -1,5 +1,7 @@
 # OpenRouter AI integration plan
 
+Current follow-up: the user simplified the screen to monthly amount and risk only. The earlier detailed-context plan below is historical. See [current request and prompt contract](OPENROUTER-SETUP.md#two-input-screen-and-prompt).
+
 ## Intended behavior
 
 Use OpenRouter with `nvidia/nemotron-3-ultra-550b-a55b:free`, one shared prompt template, and the user's current financial inputs on every generation. Return a small personalized ETF allocation with percentages, monthly amounts, and short explanations, plus one separate individual-stock research idea. Remove application generation quotas for live testing. Keep authentication and data ownership protections.

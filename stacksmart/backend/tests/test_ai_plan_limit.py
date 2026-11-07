@@ -48,3 +48,9 @@ def test_status_is_unlimited_bounded_and_scoped():
     assert status["used_count"]==15 and status["used_today"] is False
     assert ("user_id","user-a") in calls
     assert "payload" not in dict(calls)["columns"]
+
+
+def test_savings_records_are_not_labelled_as_provider_calls(patched_supabase):
+    asyncio.run(audit.complete_daily_generation("id", {"plan_source": "rule_based", "ai_model": None}))
+    update = [call["payload"] for call in patched_supabase.calls if call["method"] == "update"][0]
+    assert update["provider"] == "rule_based" and update["model"] == "rule_based"

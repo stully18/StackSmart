@@ -25,7 +25,8 @@ async def reserve_daily_generation(user_id: str, model: str, request_payload: di
 
 
 async def complete_daily_generation(generation_id: str, response_payload: dict[str, Any]) -> None:
-    metadata = {"model": response_payload["ai_model"]} if response_payload.get("ai_model") else {}
+    ai_model = response_payload.get("ai_model")
+    metadata = {"model": ai_model or "rule_based", "provider": "openrouter" if ai_model else "rule_based"}
     await run_in_threadpool(lambda: get_supabase_client().table("ai_plan_generations").update({
         **metadata, "status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(),
     }).eq("id", generation_id).eq("status", "pending").execute())

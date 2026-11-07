@@ -116,6 +116,19 @@ class ETFAllocation(BaseModel):
     description: str
     risk_level: str
 
+class SimplePlanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    monthly_investment_amount: float = Field(ge=0.01, le=1e9)
+    risk_tolerance: RiskTolerance
+
+
+class SavingsRecommendation(BaseModel):
+    name: str
+    monthly_amount: float
+    reason: str
+    risk_note: str
+
+
 class PlanningLoanData(LoanData):
     """Bounded finite inputs for AI planning without changing other loan tools."""
     model_config = ConfigDict(allow_inf_nan=False)
@@ -213,6 +226,7 @@ class AdvisorAssumptions(BaseModel):
 
 
 class PersonalizedPlanResult(BaseModel):
+    savings_recommendation: Optional[SavingsRecommendation] = None
     ai_model: Optional[str] = None
     portfolio_name: str
     risk_profile: str

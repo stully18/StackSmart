@@ -33,7 +33,7 @@ app = FastAPI(
 async def planning_validation_error_handler(request: Request, exc: RequestValidationError):
     if request.url.path == "/api/plan/generate":
         # Do not echo financial inputs, NaN, or infinity into JSON validation errors.
-        return JSONResponse(status_code=422, content={"detail": "Invalid financial inputs. Check loan amounts, field lengths, and numeric limits."})
+        return JSONResponse(status_code=422, content={"detail": "Enter a valid monthly amount and choose a risk level."})
     return await request_validation_exception_handler(request, exc)
 
 import os
@@ -604,15 +604,17 @@ async def get_etf_data(ticker: str):
 
 # ============= Personalized Financial Plan Endpoints =============
 
-from app.models.schemas import PersonalizedPlanRequest, PersonalizedPlanResult
+from app.models.schemas import PersonalizedPlanRequest, PersonalizedPlanResult, SimplePlanRequest
 
 
 @app.post("/api/plan/generate", response_model=PersonalizedPlanResult)
 async def generate_financial_plan(
-    request: PersonalizedPlanRequest,
+    request: SimplePlanRequest,
     user_id: str = Depends(verify_user_token),
 ):
     """Generate an authenticated plan and track metadata without application quotas."""
+    # This screen only accepts amount and risk. Never enrich it with saved financial data.
+    planning_request = PersonalizedPlanRequest(**request.model_dump())
     model = ai_financial_planner.DEFAULT_AI_MODEL
     generation_id = None
     try:
@@ -623,7 +625,7 @@ async def generate_financial_plan(
         )
         print(f"[DEBUG] Generating AI plan model={model}")
 
-        plan = await run_in_threadpool(ai_financial_planner.generate_ai_financial_plan, request)
+        plan = await run_in_threadpool(ai_financial_planner.generate_ai_financial_plan, planning_request)
 
         await complete_daily_generation(generation_id, plan.model_dump(mode="json"))
         return plan
