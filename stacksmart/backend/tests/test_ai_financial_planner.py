@@ -325,3 +325,25 @@ def test_untrusted_model_projection_fields_are_ignored(provider):
     from app.services.investment_projections import future_value
     assert plan.projection.goal_point.balance == round(future_value(500, plan.projection.annual_rate_percent / 100, 60), 2)
     assert plan.projection.goal_point.balance != 999999999
+
+
+def test_us_stock_reference_is_weighted_not_a_flat_portfolio_forecast(provider):
+    _, respond = provider
+    respond(_advice(proposed_allocation=[
+        {"ticker": "VOO", "percentage": 60, "reason": "US core."},
+        {"ticker": "VXUS", "percentage": 30, "reason": "International."},
+        {"ticker": "SGOV", "percentage": 10, "reason": "Stability."}]))
+    request = PersonalizedPlanRequest(monthly_investment_amount=300, risk_tolerance="aggressive", goal="20000 for a car in 3 years")
+    plan = ai.generate_ai_financial_plan(request)
+    assert plan.projection.annual_rate_percent == 7.75
+    assert plan.projection.goal_amount == 20000
+    assert plan.projection.goal_months == 36
+    assert plan.projection.shortfall > 0
+    assert "not an expected three-year return" in plan.projection.assumptions
+    from decimal import Decimal, localcontext
+    with localcontext() as context:
+        context.prec = 40
+        balance = Decimal(0)
+        for _ in range(36):
+            balance = balance * (1 + Decimal('0.0775') / 12) + 300
+    assert plan.projection.goal_point.balance == float(round(balance, 2))

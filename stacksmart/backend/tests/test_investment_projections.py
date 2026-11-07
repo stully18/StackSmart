@@ -28,6 +28,8 @@ def test_end_of_month_deposits_and_zero_rate():
     ('$30,000 for a house down payment in 5 years', 30000, 60),
     ('30 grand in two years for a down payment on a car', 30000, 24),
     ('30k in 2 years', 30000, 24),
+    ('20000 for a car in 3 years', 20000, 36),
+    ('20,000 for a car in three years', 20000, 36),
     ('$30 grand in 2 years', 30000, 24),
     ('30 thousand dollars in 2 years', 30000, 24),
     ('A car for $20k within 24 months', 20000, 24),
@@ -105,3 +107,11 @@ def test_car_goal_recognizes_grand_and_reports_the_real_gap():
     assert result["goal_point"]["balance"] == 24702.82
     assert result["shortfall"] == 5297.18
     assert result["required_monthly_amount"] == 1214.44
+
+
+def test_unmarked_goal_ignores_years_ages_and_multiple_targets():
+    assert parse_goal('a car by 2029').amount is None
+    assert parse_goal('retirement at age 2000').amount is None
+    assert parse_goal('20000 or 30000 for a car').amount is None
+    assert parse_goal('-20000 for a car').amount is None
+    assert parse_goal('1000 per month for a car').amount is None

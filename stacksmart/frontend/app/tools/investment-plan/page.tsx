@@ -191,7 +191,7 @@ function ProjectionSection({ projection: p }: { projection: Projection }) {
   return (
     <section aria-label="Savings projection" className="mt-7 rounded-2xl border border-white/10 bg-surface p-5 sm:p-6">
       <h3 className="text-xl font-semibold text-text-primary">What your monthly amount could grow to</h3>
-      <p className="mt-2 text-sm text-text-secondary">Calculated by StackSmart using {usd(p.monthly_amount)} per month and an illustrative {p.annual_rate_percent}% annual rate, compounded monthly.</p>
+      <p className="mt-2 text-sm text-text-secondary">Calculated by StackSmart using {usd(p.monthly_amount)} per month and an illustrative {p.annual_rate_percent}% nominal annual rate, compounded monthly.</p>
       {p.goal_amount !== null && <p className="mt-4 font-medium text-text-primary">Your stated target: {usd(p.goal_amount)}{p.goal_months !== null ? ` ${p.goal_months === 0 ? 'needed now' : `in ${duration(p.goal_months)}`}` : ''}</p>}
       <div className={`mt-4 grid gap-3 ${points.length > 1 ? 'sm:grid-cols-3' : ''}`}>
         {points.map(point => (
@@ -208,7 +208,7 @@ function ProjectionSection({ projection: p }: { projection: Projection }) {
       {p.goal_amount !== null && <p className="mt-2 text-sm text-text-secondary">{p.months_to_goal !== null ? `Estimated time to save your target at this monthly amount: ${duration(p.months_to_goal)}.` : `Your target is not reached within this ${p.maximum_months / 12}-year illustration.`}</p>}
       {p.parsing_note && <p className="mt-3 text-xs text-text-secondary">{p.parsing_note}</p>}
       <details className="mt-4 text-xs text-text-secondary"><summary className="cursor-pointer">How this estimate is calculated</summary><p className="mt-2 leading-relaxed">{p.assumptions}</p></details>
-      <p className="mt-3 text-xs text-text-secondary">Estimates only. Rates can change and investments can lose value. A savings target is not a guarantee that you can afford a purchase.</p>
+      <p className="mt-3 text-xs text-text-secondary">Illustrative assumptions, not a forecast for your timeframe. Rates can change and investments can lose value. A savings target is not a guarantee that you can afford a purchase.</p>
     </section>
   );
 }

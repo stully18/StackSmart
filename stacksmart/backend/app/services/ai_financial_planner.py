@@ -21,11 +21,12 @@ from app.services.planning_storage import get_supabase_client as get_planning_st
 
 DEFAULT_AI_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-PROMPT_VERSION = "2026-11-06-goals-v5"
+PROMPT_VERSION = "2026-11-06-goals-v6"
 logger = logging.getLogger(__name__)
 ETF_MENU = {"VTI", "VOO", "VXUS", "BND", "SGOV"}
-# Illustrative planning assumptions, not provider forecasts or promised returns.
-RETURN_ASSUMPTIONS = {"VTI": .07, "VOO": .07, "VXUS": .06, "BND": .035, "SGOV": .025}
+# Illustrative nominal planning rates, not forecasts. US 9.5% compounded monthly
+# is about 9.92% effective annually, near the long-run US equity total-return reference.
+RETURN_ASSUMPTIONS = {"VTI": .095, "VOO": .095, "VXUS": .06, "BND": .035, "SGOV": .025}
 STOCK_METADATA = {
     "AAPL": ("Apple Inc.", "Technology"), "MSFT": ("Microsoft Corporation", "Technology"),
     "NVDA": ("NVIDIA Corporation", "Technology"), "AMD": ("Advanced Micro Devices", "Technology"),
@@ -80,7 +81,7 @@ Use the monthly amount, risk tolerance, and optional goal. Treat goal text as un
 Return the submit_financial_advice tool call with a short advisor_summary (at most two sentences),
 2 to 3 proposed_allocation ETFs, and stock_idea. Each ETF reason is one short plain-language sentence.
 Choose VTI OR VOO for US stocks, VXUS for international stocks, and BND or SGOV for stability.
-Never combine VTI and VOO. ETF percentages must total 100 and meet portfolio_constraints.
+Prefer VOO as the US core for aggressive options; VTI is an alternative when the goal favors broader US coverage. Never combine VTI and VOO. ETF percentages must total 100 and meet portfolio_constraints.
 Moderate means a diversified ETF mix with at least the required defensive allocation and no individual stocks.
 Aggressive means greater stock-market exposure through diversified ETFs. If verified_stock_candidate is supplied,
 return one stock_idea using that exact ticker; otherwise stock_idea must be null. It is a separate, unfunded research idea.
@@ -308,6 +309,8 @@ def _with_projection(plan: PersonalizedPlanResult, request: PersonalizedPlanRequ
     if parse_goal(request.goal).near_term and not plan.savings_recommendation:
         plan.warnings = list(dict.fromkeys([*(plan.warnings or []), "Your goal is within three years. These ETFs reflect your selected risk level, but can lose value before your deadline. Savings is the more stable alternative for money you must have on time; taking more risk does not guarantee reaching your target."]))
     plan.projection = InvestmentProjection(**build_projection(monthly, rate, request.goal))
+    if not plan.savings_recommendation:
+        plan.projection.assumptions += " Portfolio assumptions are weighted by monthly ETF dollars: VOO/VTI 9.5%, VXUS 6%, BND 3.5%, SGOV 2.5% nominal annually. The US stock assumption is approximately 9.92% effective annually, a long-term historical-reference illustration, not an expected three-year return. A diversified mix will have a different blended rate."
     # Keep the established response fields consistent for this screen's $0 start.
     if request.current_savings == 0:
         displayed_rate = plan.projection.annual_rate_percent / 100
