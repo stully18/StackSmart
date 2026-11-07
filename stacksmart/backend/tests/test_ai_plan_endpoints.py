@@ -31,7 +31,7 @@ def test_timeout_returns_cors_json_and_releases_quota(planning_client, monkeypat
     def generate(request):
         raise AIPlanError("The AI provider took too long to respond. Please try again shortly.", 504)
     monkeypatch.setattr(main.ai_financial_planner, "generate_ai_financial_plan", generate)
-    response = client.post("/api/plan/generate", json={"monthly_investment_amount": 300}, headers={"Origin": "https://stacksmart.dev"})
+    response = client.post("/api/plan/generate", json={"monthly_investment_amount": 300, "risk_tolerance": "moderate"}, headers={"Origin": "https://stacksmart.dev"})
     assert response.status_code == 504
     assert "took too long" in response.json()["detail"]
     assert response.headers["access-control-allow-origin"] == "https://stacksmart.dev"
@@ -51,7 +51,7 @@ def test_generation_runs_off_event_loop_and_persists_once(planning_client, monke
         threads["generation"] = threading.get_ident()
         return _sample_plan()
     monkeypatch.setattr(main.ai_financial_planner, "generate_ai_financial_plan", generate)
-    response = client.post("/api/plan/generate", json={"monthly_investment_amount": 300})
+    response = client.post("/api/plan/generate", json={"monthly_investment_amount": 300, "risk_tolerance": "moderate"})
     assert response.status_code == 200
     assert threads["generation"] != threads["event_loop"]
     complete.assert_awaited_once()
@@ -88,7 +88,7 @@ def test_twelve_generations_are_accepted_without_daily_quota(planning_client,mon
     client,reserve,complete,release=planning_client
     monkeypatch.setattr(main.ai_financial_planner,"generate_ai_financial_plan",lambda request:_sample_plan())
     for _ in range(12):
-        response=client.post("/api/plan/generate",json={"monthly_investment_amount":300})
+        response=client.post("/api/plan/generate",json={"monthly_investment_amount":300,"risk_tolerance":"moderate"})
         assert response.status_code==200
     assert reserve.await_count==complete.await_count==12
     release.assert_not_awaited()
@@ -111,7 +111,7 @@ def test_planning_requires_authentication(monkeypatch,path,method):
     monkeypatch.setattr(main,"reserve_daily_generation",reserve)
     try:
         with TestClient(main.app) as client:
-            response=client.post(path,json={"monthly_investment_amount":300}) if method=="post" else client.get(path)
+            response=client.post(path,json={"monthly_investment_amount":300,"risk_tolerance":"moderate"}) if method=="post" else client.get(path)
         assert response.status_code==401
         reserve.assert_not_awaited()
     finally:
@@ -140,14 +140,39 @@ def test_nonfinite_nested_loan_is_rejected_before_provider(planning_client):
 
 
 @pytest.mark.parametrize("principal,payment", [(0, 0), (1000, 0)])
-def test_planning_accepts_paid_or_deferred_saved_loans(planning_client, monkeypatch, principal, payment):
+def test_simple_screen_rejects_hidden_saved_loan_context(planning_client, monkeypatch, principal, payment):
     client, reserve, complete, release = planning_client
     monkeypatch.setattr(main.ai_financial_planner, "generate_ai_financial_plan", lambda request: _sample_plan())
     response = client.post("/api/plan/generate", json={
         "monthly_investment_amount": 300,
+        "risk_tolerance": "moderate",
         "loans": [{"principal": principal, "minimum_payment": payment, "interest_rate": 0.05}],
     })
-    assert response.status_code == 200
-    reserve.assert_awaited_once()
-    complete.assert_awaited_once()
+    assert response.status_code == 422
+    reserve.assert_not_awaited()
+    complete.assert_not_awaited()
     release.assert_not_awaited()
+
+
+def test_endpoint_only_supplies_amount_and_risk(planning_client, monkeypatch):
+    client, *_ = planning_client
+    captured = []
+    def generate(request):
+        captured.append(request)
+        return _sample_plan()
+    monkeypatch.setattr(main.ai_financial_planner, "generate_ai_financial_plan", generate)
+    response = client.post("/api/plan/generate", json={"monthly_investment_amount": 450, "risk_tolerance": "aggressive"})
+    assert response.status_code == 200
+    assert captured[0].model_fields_set == {"monthly_investment_amount", "risk_tolerance"}
+
+
+@pytest.mark.parametrize("payload", [
+    {"monthly_investment_amount": 100},
+    {"monthly_investment_amount": 0, "risk_tolerance": "moderate"},
+    {"monthly_investment_amount": 100, "risk_tolerance": "unknown"},
+    {"monthly_investment_amount": 100, "risk_tolerance": "moderate", "notes": "do not forward"},
+])
+def test_simple_screen_requires_two_valid_inputs(planning_client, payload):
+    client, reserve, *_ = planning_client
+    assert client.post("/api/plan/generate", json=payload).status_code == 422
+    reserve.assert_not_awaited()

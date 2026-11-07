@@ -119,7 +119,7 @@ def test_current_context_changes_each_request_and_holdings_are_not_added_twice(p
         assert result.projected_value_1yr == round(expected,2)
     inputs = [json.loads(call["json"]["messages"][1]["content"].split("INPUT_JSON: ")[1])["user_inputs"] for call in provider[0]]
     assert [item["monthly_investment_amount"] for item in inputs] == [100,500]
-    assert inputs[0]["existing_holdings"][0]["ticker"] == "VTI"
+    assert all(set(item) == {"monthly_investment_amount", "risk_tolerance"} for item in inputs)
 
 
 def test_liquidity_budget_and_projection_use_one_cash_reserve(provider):
@@ -143,13 +143,13 @@ def test_only_verified_stock_is_used_without_budget(provider, monkeypatch):
     candidate = {"ticker":"NVDA","name":"NVIDIA Corporation","sector":"Technology","as_of":"2026-11-06","supporting_context":"Dated screen selected this company."}
     monkeypatch.setattr(ai,"_verified_stock_candidate",lambda:candidate)
     provider[1](_advice(stock_idea={"ticker":"NVDA","reason":"Screen selected it.","risk_note":"Concentration risk."}))
-    plan = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    plan = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500,risk_tolerance="aggressive"))
     idea = plan.satellite_stock_ideas[0]
     assert idea.allocation_percent == idea.monthly_amount == 0
     assert idea.sector == "Technology" and plan.stock_idea_status == "available"
     provider[1](_advice(stock_idea={"ticker":"AAPL","reason":"Wrong pick.","risk_note":"Risk."}))
     with pytest.raises(ai.AIPlanError):
-        ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+        ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500,risk_tolerance="aggressive"))
 
 
 @pytest.mark.parametrize("status", [401,429,503])
@@ -267,3 +267,29 @@ def test_planning_storage_transport_is_short_and_disables_retries(monkeypatch):
     if hasattr(options,"postgrest_client_retry"):
         assert options.postgrest_client_retry is False
     assert options.auto_refresh_token is False
+
+
+def test_low_risk_uses_savings_without_provider_or_stock_lookup(provider, monkeypatch):
+    monkeypatch.setattr(ai, "_verified_stock_candidate", lambda: pytest.fail("No stock lookup for low risk"))
+    plan = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=250, risk_tolerance="conservative"))
+    assert plan.savings_recommendation.monthly_amount == 250
+    assert plan.target_allocation == [] and plan.satellite_stock_ideas == []
+    assert plan.ai_model is None and provider[0] == []
+    assert "variable APY" in plan.savings_recommendation.risk_note
+
+
+def test_balanced_does_not_request_individual_stocks(provider, monkeypatch):
+    monkeypatch.setattr(ai, "_verified_stock_candidate", lambda: pytest.fail("No stock lookup for balanced risk"))
+    plan = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=250))
+    assert plan.satellite_stock_ideas == []
+    schema = provider[0][0]["json"]["tools"][0]["function"]["parameters"]
+    assert "advisor_cards" not in schema["properties"]
+    assert "advisor_assumptions" not in schema["properties"]
+
+
+def test_disabled_higher_risk_has_more_equity_exposure(provider, monkeypatch):
+    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "false")
+    balanced = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, risk_tolerance="moderate"))
+    higher = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, risk_tolerance="aggressive"))
+    equity = lambda plan: sum(item.percentage for item in plan.target_allocation if item.ticker in {"VTI", "VOO", "VXUS"})
+    assert equity(higher) > equity(balanced)
