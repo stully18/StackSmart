@@ -33,6 +33,22 @@ def parse_goal(text: str | None) -> GoalContext:
         value = float((match[1] or match[3]).replace(',', '')) * scale
         if .01 <= value <= 1e12:
             amounts.append(value)
+    # This USD planner also accepts a single unmarked amount (e.g. 20000 for a car).
+    # Exclude deadlines, ages, recurring deposits, negatives and calendar years.
+    if not money:
+        bare = []
+        for match in re.finditer(r"(?<![\w$.,-])(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)(?![\w.,])", text):
+            before, after = text[:match.start()], text[match.end():]
+            if re.match(r"\s*(?:years?|yrs?|months?|mos?|per\s+month|a\s+month|monthly|/\s*mo)\b", after, re.I):
+                continue
+            if re.search(r"\b(?:in|by|during|year|age)\s*$", before, re.I):
+                continue
+            value = float(match[1].replace(',', ''))
+            if 1000 <= value <= 1e12:
+                bare.append(value)
+        if len(bare) == 1:
+            amounts = bare
+            money = [None]  # Exactly one explicit amount, without a currency marker.
     periods = list(re.finditer(r"(?<![\w.-])(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|a)\s*(years?|yrs?|months?|mos?)\b", text, re.I))
     words = {"a": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
     durations = []
@@ -115,7 +131,8 @@ def build_projection(monthly: float, annual_rate: float, goal: str | None) -> di
     goal_point = point(context.months) if context.months is not None else None
     gap = None if context.amount is None or goal_point is None else round(max(context.amount - goal_point['balance'], 0), 2)
     return {"annual_rate_percent": round(annual_rate * 100, 4), "monthly_amount": monthly,
-            "milestones": [point(n) for n in (12, 36, 60)], "goal_amount": context.amount,
+            "milestones": [point(n) for n in (12, 36, 60, 120, 180, 240, 360)],
+            "series": [point(n) for n in range(0, 361, 12)], "goal_amount": context.amount,
             "goal_months": context.months, "goal_point": goal_point, "shortfall": gap,
             "required_monthly_amount": required,
             "months_to_goal": months_to_goal(monthly, annual_rate, context.amount) if context.amount is not None else None,

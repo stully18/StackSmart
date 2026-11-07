@@ -127,6 +127,7 @@ class InvestmentProjection(BaseModel):
     annual_rate_percent: float
     monthly_amount: float
     milestones: List[ProjectionPoint]
+    series: List[ProjectionPoint] = Field(default_factory=list)
     goal_amount: Optional[float] = None
     goal_months: Optional[int] = None
     goal_point: Optional[ProjectionPoint] = None
