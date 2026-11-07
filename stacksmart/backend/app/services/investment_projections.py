@@ -131,7 +131,8 @@ def build_projection(monthly: float, annual_rate: float, goal: str | None) -> di
     goal_point = point(context.months) if context.months is not None else None
     gap = None if context.amount is None or goal_point is None else round(max(context.amount - goal_point['balance'], 0), 2)
     return {"annual_rate_percent": round(annual_rate * 100, 4), "monthly_amount": monthly,
-            "milestones": [point(n) for n in (12, 36, 60)], "goal_amount": context.amount,
+            "milestones": [point(n) for n in (12, 36, 60, 120, 180, 240, 360)],
+            "series": [point(n) for n in range(0, 361, 12)], "goal_amount": context.amount,
             "goal_months": context.months, "goal_point": goal_point, "shortfall": gap,
             "required_monthly_amount": required,
             "months_to_goal": months_to_goal(monthly, annual_rate, context.amount) if context.amount is not None else None,

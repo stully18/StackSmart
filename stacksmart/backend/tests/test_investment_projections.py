@@ -1,4 +1,4 @@
-from decimal import Decimal, getcontext
+from decimal import Decimal, getcontext, localcontext
 
 import pytest
 
@@ -115,3 +115,21 @@ def test_unmarked_goal_ignores_years_ages_and_multiple_targets():
     assert parse_goal('20000 or 30000 for a car').amount is None
     assert parse_goal('-20000 for a car').amount is None
     assert parse_goal('1000 per month for a car').amount is None
+
+
+@pytest.mark.parametrize("rate", [0, .03, .0775, -.03])
+def test_long_term_milestones_and_chart_samples_use_independent_monthly_math(rate):
+    result = build_projection(300, rate, '$20,000 in 10 years')
+    assert [point['months'] for point in result['milestones']] == [12, 36, 60, 120, 180, 240, 360]
+    assert [point['months'] for point in result['series']] == list(range(0, 361, 12))
+    with localcontext() as context:
+        context.prec = 45
+        balance = Decimal(0)
+        for month in range(361):
+            if month % 12 == 0:
+                point = result['series'][month // 12]
+                assert point['balance'] == float(round(balance, 2))
+                assert point['contributions'] == 300 * month
+                assert point['balance'] == pytest.approx(point['contributions'] + point['growth'], abs=.01)
+            balance = balance * (1 + Decimal(str(rate)) / 12) + 300
+    assert result['goal_point'] == result['milestones'][3]
