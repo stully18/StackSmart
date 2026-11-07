@@ -1,6 +1,6 @@
 # OpenRouter AI integration plan
 
-Current follow-up: the user simplified the screen to monthly amount and risk only. The earlier detailed-context plan below is historical. See [current request and prompt contract](OPENROUTER-SETUP.md#two-input-screen-and-prompt).
+Current follow-up: the screen has monthly amount and risk, one optional goal box, and deterministic goal projections. The earlier detailed-context plan below is historical. See [current request and prompt contract](OPENROUTER-SETUP.md#two-input-screen-and-prompt).
 
 ## Intended behavior
 

@@ -17,3 +17,14 @@ describe('two-input investment request', () => {
     expect(investmentInputs('0.01', 'conservative')).toEqual({ monthly_investment_amount: 0.01, risk_tolerance: 'conservative' });
   });
 });
+
+
+describe('optional goal context', () => {
+  it('includes a trimmed goal only when supplied', () => {
+    expect(investmentInputs('500', 'moderate', '  $30,000 in 5 years  ')).toEqual({ monthly_investment_amount: 500, risk_tolerance: 'moderate', goal: '$30,000 in 5 years' });
+    expect(investmentInputs('500', 'moderate', '   ')).not.toHaveProperty('goal');
+  });
+  it('rejects oversized context instead of silently truncating it', () => {
+    expect(() => investmentInputs('500', 'moderate', 'x'.repeat(501))).toThrow('500');
+  });
+});

@@ -176,3 +176,13 @@ def test_simple_screen_requires_two_valid_inputs(planning_client, payload):
     client, reserve, *_ = planning_client
     assert client.post("/api/plan/generate", json=payload).status_code == 422
     reserve.assert_not_awaited()
+
+
+def test_goal_is_optional_trimmed_and_forwarded_without_other_context(planning_client, monkeypatch):
+    client, *_ = planning_client
+    captured = []
+    monkeypatch.setattr(main.ai_financial_planner, "generate_ai_financial_plan", lambda request: captured.append(request) or _sample_plan())
+    response = client.post("/api/plan/generate", json={"monthly_investment_amount": 500, "risk_tolerance": "moderate", "goal": "  $40k in 5 years  "})
+    assert response.status_code == 200 and captured[0].goal == "$40k in 5 years"
+    assert captured[0].loans == [] and captured[0].existing_holdings == []
+    assert client.post("/api/plan/generate", json={"monthly_investment_amount": 500, "risk_tolerance": "moderate", "goal": "x" * 501}).status_code == 422
