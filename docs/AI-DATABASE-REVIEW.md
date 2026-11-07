@@ -29,3 +29,14 @@ Apply the migration before enabling the new backend. It is compatible with the e
 ## Security verification expectations
 
 Test anon and authenticated roles for no generation-table CRUD privileges, service-role inserts beyond ten generations, preservation of history, and migration idempotency. Test one user cannot obtain another user's generation metadata through the API. A broader launch audit should separately test saved plans, profiles, loan RPCs, and Plaid ownership with two distinct users; this task's focused verification does not certify the entire application.
+
+
+## Hosted migration follow-up
+
+The restored Supabase MCP connection confirmed StackSmart's backend project as `FratFinance` (`nckejxsomqvwxovrcmyz`). Applied the committed `005_unlimited_ai_plan_generations.sql` through the migration tool as `unlimited_ai_plan_generations` after inspecting the live schema.
+
+Verified all eight history rows were preserved; daily slot constraints were removed; the legacy slot column is nullable; the provider default is OpenRouter; the partial status index exists; and RLS remains enabled. `anon` and `authenticated` have no direct SELECT/INSERT/UPDATE/DELETE privileges, while `service_role` retains them. A rollback-only service-role transaction inserted thirteen generations successfully and left no test rows behind.
+
+Security advisors before and after reported the same existing findings: mutable search paths for `set_updated_at` and `handle_new_user`, public-role EXECUTE access to the SECURITY DEFINER `handle_new_user` function, and disabled leaked-password protection. The no-policy notice on `market_data_cache` matches its intentional backend-only lockdown. No unrelated security settings/functions were changed. References: [search-path remediation](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable), [privileged function access](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable), [password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
+
+This supersedes the earlier Supabase connection blocker. It verifies the generation table and migration, not all application policies or functions. Application code remains on `dev`; no application deployment or merge into `main` was performed. The currently deployed backend still has its old application quota until the new code is deployed.
