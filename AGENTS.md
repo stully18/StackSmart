@@ -9,6 +9,15 @@
 - Include a short commit body stating what changed, why, and what verification was performed.
 - Preserve unrelated working-tree changes.
 
+## MCP Connections and Deployments
+
+- At the start of every task, check which project MCP connections are available. StackSmart uses Vercel for the frontend, Railway for the backend, and Supabase for the database and authentication.
+- Before operating on a service, verify its MCP connection with a read-only request and confirm the StackSmart project and target environment. Prefer the relevant MCP tools for service operations.
+- If a connection is missing or fails, report the limitation and use an available authenticated CLI or other supported fallback when possible. Do not assume an advertised tool is connected or claim an unverified operation succeeded.
+- For any deployment triggered by the task, monitor each affected service until it reaches a successful terminal state. Inspect build and runtime logs when failures occur, fix task-related problems, and verify the resulting deployment corresponds to the intended commit and environment.
+- After deployment, check the affected live route or API flow and relevant service health, including database connectivity when affected. A successful build alone does not complete deployment verification.
+- Report deployment results and any verification blockers. Deployment checks do not authorize merging `dev` into `main`; that still requires the user's explicit request.
+
 ## Repository Map
 
 - `stacksmart/frontend/app`: Next.js App Router pages, layouts, auth, settings, and financial tools.
@@ -48,6 +57,9 @@
 
 ## Database and Migrations
 
+- The user grants standing authorization to run SQL and create or modify tables, schema, functions, policies, and related database objects when needed to complete a requested StackSmart task. Carry out necessary database work through the project MCP connection or an available authenticated fallback without asking for routine SQL approval again.
+- Confirm the target project and environment, inspect the existing schema, and preserve existing data when making database changes. Keep database work within the requested task's scope.
+- Record schema changes in a version-controlled SQL migration, apply it to the intended environment when required by the task, and verify the resulting schema and affected behavior. Report what was applied and where.
 - Migrations are SQL applied manually; do not assume a migration CLI or unique numeric prefixes.
 - Read related schema and setup documentation before changing database behavior.
 - Preserve RLS, grants, ownership checks, and function security properties. Include explicit policies and grants in schema changes where needed.
