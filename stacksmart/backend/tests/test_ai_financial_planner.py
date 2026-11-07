@@ -295,12 +295,14 @@ def test_disabled_higher_risk_has_more_equity_exposure(provider, monkeypatch):
     assert equity(higher) > equity(balanced)
 
 
-def test_near_term_goal_uses_savings_even_when_risk_is_high(provider):
+def test_near_term_goal_preserves_high_risk_and_calls_provider(provider):
     plan = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, risk_tolerance="aggressive", goal="$20,000 for a car in 2 years"))
-    assert plan.savings_recommendation and plan.target_allocation == []
-    assert provider[0] == []
+    assert plan.savings_recommendation is None and plan.target_allocation
+    assert len(provider[0]) == 1
+    assert plan.plan_source == "ai"
+    assert any("Your goal is within three years" in warning for warning in plan.warnings)
     assert plan.projection.goal_months == 24 and plan.projection.goal_amount == 20000
-    assert plan.projection.annual_rate_percent == 3
+    assert plan.projection.annual_rate_percent > 3
     assert plan.projection.monthly_amount == 500
     assert plan.projected_value_1yr == plan.projection.milestones[0].balance
     assert plan.projected_value_5yr == plan.projection.milestones[2].balance

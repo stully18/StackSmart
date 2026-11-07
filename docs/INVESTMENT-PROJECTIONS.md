@@ -2,9 +2,9 @@
 
 ## Inputs and interpretation
 
-The screen has two required inputs (monthly amount and risk) and one optional goal box. No saved profile or loan data is loaded. Goal text is bounded to 500 characters and is treated as untrusted context. Parsing is deterministic: one explicit USD amount and one explicit relative timeframe, such as `$40,000 for a house down payment in 5 years`. Shorthand dollar amounts and common relative durations are supported. Ambiguous values, unstated prices, absolute calendar deadlines, existing balances, and target ages are not inferred. The UI displays the interpreted amount and duration so the user can review them. Goals without a clear target/deadline receive generic 1/3/5-year illustrations and guidance to supply the missing values.
+The screen has two required inputs (monthly amount and risk) and one optional goal box. No saved profile or loan data is loaded. Goal text is bounded to 500 characters and is treated as untrusted context. Parsing is deterministic: one explicit USD amount and one explicit relative timeframe, such as `$40,000 for a house down payment in 5 years`. Shorthand amounts such as 30 grand, 30k, and 30 thousand, and common relative durations are supported. Ambiguous values, unstated prices, absolute calendar deadlines, existing balances, and target ages are not inferred. The UI displays the interpreted amount and duration so the user can review them. Goals without a clear target/deadline receive generic 1/3/5-year illustrations and guidance to supply the missing values.
 
-A recognized spending need within 36 months, or explicit near-term/emergency liquidity language, selects savings even if risk tolerance is high. This is a simple liquidity guard, not a complete financial assessment.
+Low risk selects rule-based savings. Balanced and higher risk retain their selected risk level and call AI even for a short goal. A server-owned warning explains the conflict between a deadline within three years and possible ETF losses; it does not silently change the selected risk. Projection math remains deterministic and does not raise return assumptions to make a target appear achievable.
 
 ## Formula
 
@@ -30,6 +30,8 @@ References: [SEC compound-interest calculator](https://www.investor.gov/financia
 
 ## Verification
 
-The final focused backend suite passed 115 tests; 18 frontend tests and the production build also passed. The backend suite includes an independent high-precision Decimal monthly-balance recurrence across 0/1/12/60/600 months and negative, zero, very small, and positive rates. It checks exact goal boundaries, cent rounding, required payments, first-month attainment, malformed/ambiguous goal text, no invented targets, near-term savings overrides, and ignoring AI-supplied projection fields.
+The goal-input and risk-selection fix passed 120 focused backend tests; 18 frontend tests and the production build also passed. The backend suite includes an independent high-precision Decimal monthly-balance recurrence across 0/1/12/60/600 months and negative, zero, very small, and positive rates. It checks exact goal boundaries, cent rounding, required payments, first-month attainment, malformed/ambiguous goal text, no invented targets, short-deadline risk preservation with warnings, and ignoring AI-supplied projection fields.
 
 Frontend checks cover optional-goal trimming/limits. Desktop/mobile Playwright checks exercise the actual component with compiled styles and synthetic auth/API responses, optional/omitted goals, server fixture amounts, target comparison, no overflow, error recovery, and signed-out redirect behavior. This is isolated component verification, not a deployed or Next.js route-level check. Live synthetic OpenRouter goal requests passed; the backend computed their resulting projections locally. No production deployment or SQL migration was performed for this follow-up.
+
+The car-goal regression (30 grand in two years, $1,000/month, higher risk) was also checked against the live fixed Nemotron model using synthetic inputs and quotes. The actual React component was visually checked on desktop/mobile with that returned plan; this is an isolated component check, not a deployed route check. No deployment or database change was made for this fix.
