@@ -139,11 +139,11 @@ export default function Calculator401kPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {/* Salary */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="401k-salary" className="block text-sm font-medium text-text-secondary mb-2">
                 Annual Salary: ${salary.toLocaleString()}
               </label>
               <input
-                type="range"
+                id="401k-salary" type="range" aria-label="Annual salary"
                 min="30000"
                 max="200000"
                 step="5000"
@@ -159,11 +159,11 @@ export default function Calculator401kPage() {
 
             {/* Annual Salary Increase */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="401k-salary-increase" className="block text-sm font-medium text-text-secondary mb-2">
                 Annual Salary Increase: {salaryIncrease}%
               </label>
               <input
-                type="range"
+                id="401k-salary-increase" type="range" aria-label="Annual salary increase"
                 min="0"
                 max="8"
                 step="0.5"
@@ -180,11 +180,11 @@ export default function Calculator401kPage() {
 
             {/* Your Contribution % */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="401k-contribution" className="block text-sm font-medium text-text-secondary mb-2">
                 Your Contribution: {contributionPercent}% (${results.annualContribution.toLocaleString()}/yr)
               </label>
               <input
-                type="range"
+                id="401k-contribution" type="range" aria-label="Your contribution percentage"
                 min="1"
                 max="22"
                 step="1"
@@ -200,11 +200,11 @@ export default function Calculator401kPage() {
 
             {/* Employer Match % */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="401k-employer-match" className="block text-sm font-medium text-text-secondary mb-2">
                 Employer Match Rate: {employerMatchPercent}%
               </label>
               <input
-                type="range"
+                id="401k-employer-match" type="range" aria-label="Employer match rate"
                 min="0"
                 max="100"
                 step="25"
@@ -221,11 +221,11 @@ export default function Calculator401kPage() {
 
             {/* Employer Match Cap */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="401k-match-cap" className="block text-sm font-medium text-text-secondary mb-2">
                 Employer Match Cap: {employerMatchCap}% of salary
               </label>
               <input
-                type="range"
+                id="401k-match-cap" type="range" aria-label="Employer match cap"
                 min="0"
                 max="10"
                 step="1"
@@ -242,11 +242,11 @@ export default function Calculator401kPage() {
 
             {/* Years to Retirement */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="401k-retirement-years" className="block text-sm font-medium text-text-secondary mb-2">
                 Years Until Retirement: {yearsToRetirement}
               </label>
               <input
-                type="range"
+                id="401k-retirement-years" type="range" aria-label="Years until retirement"
                 min="5"
                 max="45"
                 value={yearsToRetirement}
@@ -261,11 +261,11 @@ export default function Calculator401kPage() {
 
             {/* Expected Return */}
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="401k-expected-return" className="block text-sm font-medium text-text-secondary mb-2">
                 Expected Annual Return: {expectedReturn}%
               </label>
               <input
-                type="range"
+                id="401k-expected-return" type="range" aria-label="Expected annual return"
                 min="4"
                 max="10"
                 step="0.5"

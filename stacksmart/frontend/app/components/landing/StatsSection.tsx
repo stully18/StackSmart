@@ -1,5 +1,7 @@
 'use client'
 
+import { useMotionPreference } from '@/app/components/MotionPreferences'
+
 import { useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 
@@ -11,6 +13,7 @@ const stats = [
 ]
 
 export default function StatsSection() {
+  const reducedMotion = useMotionPreference()
   const ref = useRef<HTMLDivElement>(null)
   const isInView = useInView(ref, { once: true, margin: '0px', amount: 0 })
 
@@ -22,11 +25,11 @@ export default function StatsSection() {
             <motion.div
               key={stat.label}
               className="text-center"
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+              initial={reducedMotion ? false : { opacity: 0, y: 6 }}
+              animate={isInView || reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }}
               transition={{
-                duration: 0.5,
-                delay: i * 0.1,
+                duration: reducedMotion ? 0 : 0.2,
+                delay: reducedMotion ? 0 : i * 0.035,
                 ease: [0.22, 1, 0.36, 1],
               }}
             >

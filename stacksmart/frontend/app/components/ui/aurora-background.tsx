@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import type { ReactNode } from 'react'
+import { useMotionPreference } from '@/app/components/MotionPreferences'
 
 type AuroraBackgroundProps = {
   children: ReactNode
@@ -9,6 +10,7 @@ type AuroraBackgroundProps = {
 }
 
 export function AuroraBackground({ children, className = '' }: AuroraBackgroundProps) {
+  const reducedMotion = useMotionPreference()
   return (
     <div className={`relative overflow-hidden ${className}`}>
       <div className="pointer-events-none absolute inset-0">
@@ -20,8 +22,8 @@ export function AuroraBackground({ children, className = '' }: AuroraBackgroundP
               'radial-gradient(circle at 50% 50%, rgba(190,255,0,0.15) 0%, rgba(190,255,0,0.07) 42%, transparent 72%)',
             mixBlendMode: 'screen',
           }}
-          animate={{ x: [-10, 12, -6, -10], y: [0, -8, 5, 0] }}
-          transition={{ duration: 28, repeat: Infinity, ease: 'easeInOut' }}
+          animate={reducedMotion ? { x: 0, y: 0 } : { x: [-10, 12, -6, -10], y: [0, -8, 5, 0] }}
+          transition={reducedMotion ? { duration: 0, repeat: 0 } : { duration: 28, repeat: Infinity, ease: 'easeInOut' }}
         />
         <motion.div
           aria-hidden="true"
@@ -31,8 +33,8 @@ export function AuroraBackground({ children, className = '' }: AuroraBackgroundP
               'radial-gradient(circle at 50% 50%, rgba(0,212,170,0.11) 0%, rgba(0,212,170,0.04) 48%, transparent 74%)',
             mixBlendMode: 'screen',
           }}
-          animate={{ x: [0, -12, 10, 0], y: [0, 8, -8, 0] }}
-          transition={{ duration: 32, repeat: Infinity, ease: 'easeInOut' }}
+          animate={reducedMotion ? { x: 0, y: 0 } : { x: [0, -12, 10, 0], y: [0, 8, -8, 0] }}
+          transition={reducedMotion ? { duration: 0, repeat: 0 } : { duration: 32, repeat: Infinity, ease: 'easeInOut' }}
         />
         <div
           aria-hidden="true"

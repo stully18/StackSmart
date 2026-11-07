@@ -133,6 +133,7 @@ export default function LoginForm() {
           {/* Submit Button */}
           <button
             type="submit"
+            aria-busy={isLoading}
             disabled={isLoading}
             className="w-full px-4 py-2 btn-gradient text-gray-900 font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:bg-surface-elevated disabled:text-text-muted disabled:cursor-not-allowed disabled:bg-none transition-colors active:scale-[0.98]"
           >

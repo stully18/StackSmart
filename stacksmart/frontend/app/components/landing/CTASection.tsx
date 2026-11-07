@@ -1,11 +1,14 @@
 'use client'
 
+import { useMotionPreference } from '@/app/components/MotionPreferences'
+
 import { useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import Link from 'next/link'
 import { useAuth } from '@/app/context/AuthContext'
 
 export default function CTASection() {
+  const reducedMotion = useMotionPreference()
   const ref = useRef<HTMLDivElement>(null)
   const isInView = useInView(ref, { once: true, margin: '0px', amount: 0 })
   const { user, isLoading } = useAuth()
@@ -22,9 +25,9 @@ export default function CTASection() {
 
       <motion.div
         className="relative z-10 max-w-2xl mx-auto text-center"
-        initial={{ opacity: 0, y: 20 }}
-        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        initial={reducedMotion ? false : { opacity: 0, y: 6 }}
+        animate={isInView || reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }}
+        transition={{ duration: reducedMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
       >
         <h2 className="font-serif text-4xl md:text-5xl text-text-primary tracking-[-0.03em] mb-4">
           Start Building Your Financial Future

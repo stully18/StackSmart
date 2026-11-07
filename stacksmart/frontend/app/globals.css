@@ -120,3 +120,100 @@ input[type='range']::-moz-range-thumb:hover {
 ::-webkit-scrollbar-thumb:hover {
   background: #4A5568;
 }
+
+@keyframes interaction-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.interaction-enter {
+  animation: interaction-enter 180ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Shared interaction polish. Low specificity lets each feature keep its layout. */
+@layer base {
+  :root {
+    color-scheme: dark;
+    --interaction-duration: 180ms;
+    --interaction-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+
+  :where(button, a, input, textarea, select, summary, [role='button'], label:has(input[type='radio'])) {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: var(--interaction-duration);
+    transition-timing-function: var(--interaction-ease);
+  }
+
+  :where(button, [role='button'], summary, select) { touch-action: manipulation; }
+  :where(button, [role='button'], summary) { -webkit-tap-highlight-color: transparent; }
+  :where(button:disabled, input:disabled, select:disabled, textarea:disabled) { cursor: not-allowed; }
+  :where(input[type='checkbox'], input[type='radio'], progress) { accent-color: #BEFF00; }
+
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238B9DC3' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.5rem;
+  }
+  select[multiple], select[size]:not([size='1']) { background-image: none; }
+  select option, select optgroup { color: #F0F4F8; background: #111827; }
+}
+
+/* Visible keyboard focus is consistent even on controls with outline-none. */
+:where(button, a, input, textarea, select, summary, [role='button']):focus-visible {
+  outline: 2px solid #BEFF00;
+  outline-offset: 3px;
+}
+
+:where(input:not([type='range']):not([type='checkbox']):not([type='radio']), textarea, select):hover:not(:disabled):not(:focus) {
+  border-color: rgba(139, 157, 195, 0.45);
+}
+
+/* Reserve room for the custom chevron even on compact utility-styled selects. */
+select:not([multiple]):not([size]), select[size='1'] { padding-right: 2.5rem; }
+
+@layer components {
+  .number-input { position: relative; width: 100%; min-width: 0; }
+  .number-input > input { width: 100%; padding-right: 6.25rem !important; appearance: textfield; -moz-appearance: textfield; }
+  .number-input > input::-webkit-inner-spin-button,
+  .number-input > input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .number-input__steppers { position: absolute; right: 3px; top: 3px; bottom: 3px; display: flex; align-items: center; }
+  .number-input__steppers button {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 100%; max-height: 44px; border-radius: 8px;
+    color: #8B9DC3; font-size: 20px; line-height: 1; font-weight: 500;
+  }
+  .number-input__steppers button:disabled { opacity: 0.35; }
+  .number-input__steppers button:not(:disabled):active { background: rgba(190, 255, 0, 0.16); }
+  .btn-polish { transition: color 180ms, background-color 180ms, box-shadow 180ms, transform 180ms, filter 180ms; }
+  .btn-polish:not(:disabled):active { transform: scale(0.99); }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .number-input__steppers button:not(:disabled):hover { color: #BEFF00; background: rgba(190, 255, 0, 0.1); }
+  .btn-gradient:not(:disabled):hover, .btn-ghost:not(:disabled):hover { transform: translateY(-1px); }
+  .btn-polish:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.06); }
+}
+
+@media (forced-colors: active) {
+  select { appearance: auto; background-image: none; }
+  select option, select optgroup { color: CanvasText; background: Canvas; }
+  .number-input__steppers button { color: ButtonText; border: 1px solid ButtonText; }
+  .number-input__steppers button:disabled { color: GrayText; }
+  :where(button, a, input, textarea, select, summary, [role='button']):focus-visible { outline-color: Highlight; }
+}
+
+/* Honor the preference across legacy animations as well as the new controls. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn-gradient:hover, .btn-gradient:active, .btn-ghost:hover, .btn-ghost:active,
+  .btn-polish:hover, .btn-polish:active { transform: none !important; }
+}

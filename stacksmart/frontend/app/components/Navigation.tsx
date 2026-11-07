@@ -1,5 +1,7 @@
 'use client'
 
+import { useMotionPreference } from '@/app/components/MotionPreferences'
+
 import Link from 'next/link'
 import { useAuth } from '@/app/context/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
@@ -15,6 +17,10 @@ export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const accountButtonRef = useRef<HTMLButtonElement>(null)
+  const mobileButtonRef = useRef<HTMLButtonElement>(null)
+  const navRef = useRef<HTMLElement>(null)
+  const reducedMotion = useMotionPreference()
 
   const handleLogout = async () => {
     await signOut()
@@ -47,7 +53,31 @@ export default function Navigation() {
   // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false)
+    setShowDropdown(false)
   }, [pathname])
+
+  useEffect(() => {
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (showDropdown) {
+        setShowDropdown(false)
+        accountButtonRef.current?.focus()
+      }
+      if (mobileMenuOpen) {
+        setMobileMenuOpen(false)
+        mobileButtonRef.current?.focus()
+      }
+    }
+    const outside = (event: PointerEvent) => {
+      if (!navRef.current?.contains(event.target as Node)) setMobileMenuOpen(false)
+    }
+    document.addEventListener('keydown', dismiss)
+    document.addEventListener('pointerdown', outside)
+    return () => {
+      document.removeEventListener('keydown', dismiss)
+      document.removeEventListener('pointerdown', outside)
+    }
+  }, [showDropdown, mobileMenuOpen])
 
   // Hide nav on auth pages
   if (pathname?.startsWith('/auth')) {
@@ -66,6 +96,8 @@ export default function Navigation() {
 
   return (
     <nav
+      ref={navRef}
+      aria-label="Main navigation"
       className={`sticky top-0 z-40 transition-all duration-300 ${
         isTransparent
           ? 'bg-transparent border-b border-transparent'
@@ -112,6 +144,11 @@ export default function Navigation() {
             ) : user ? (
               <div className="relative" ref={dropdownRef}>
                 <button
+                  ref={accountButtonRef}
+                  type="button"
+                  aria-expanded={showDropdown}
+                  aria-controls="account-options"
+                  aria-label="Account options"
                   onClick={() => setShowDropdown(!showDropdown)}
                   className="h-11 px-4 rounded-lg bg-surface border border-border-subtle hover:border-border text-text-secondary hover:text-text-primary transition-colors duration-200 flex items-center gap-3"
                 >
@@ -121,12 +158,14 @@ export default function Navigation() {
                     </span>
                   </div>
                   <span className="text-[15px] hidden sm:inline">{user.email}</span>
-                  <ChevronDown size={12} className="text-text-muted ml-0.5" />
+                  <ChevronDown size={12} className={`text-text-muted ml-0.5 transition-transform duration-150 ${showDropdown ? 'rotate-180' : ''}`} />
                 </button>
 
                 {/* Dropdown Menu */}
                 {showDropdown && (
-                  <div className="absolute right-0 mt-1.5 w-52 bg-surface border border-border-subtle rounded-xl shadow-2xl shadow-black/60 py-1 z-50">
+                  <div id="account-options" className="interaction-enter absolute right-0 mt-1.5 w-52 bg-surface border border-border-subtle rounded-xl shadow-2xl shadow-black/60 py-1 z-50" onBlur={event => {
+                    if (!dropdownRef.current?.contains(event.relatedTarget as Node)) setShowDropdown(false)
+                  }}>
                     <div className="px-3 py-2 border-b border-border-subtle mb-1">
                       <p className="text-xs text-text-muted truncate">{user.email}</p>
                     </div>
@@ -172,6 +211,10 @@ export default function Navigation() {
 
           {/* Mobile hamburger button */}
           <button
+            ref={mobileButtonRef}
+            type="button"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-elevated/60 transition-colors duration-200"
             aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
@@ -185,10 +228,11 @@ export default function Navigation() {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
+            id="mobile-navigation"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ duration: reducedMotion ? 0 : 0.18, ease: [0.4, 0, 0.2, 1] }}
             className="md:hidden overflow-hidden"
           >
             <div className="bg-surface/95 backdrop-blur-xl border-t border-border-subtle/60 px-5 py-4 flex flex-col gap-1">
