@@ -1,10 +1,13 @@
 'use client'
 
+import { useMotionPreference } from '@/app/components/MotionPreferences'
+
 import { useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import { TrendingUp, CreditCard, Check } from 'lucide-react'
 
 export default function DashboardPreview() {
+  const reducedMotion = useMotionPreference()
   const ref = useRef<HTMLDivElement>(null)
   const isInView = useInView(ref, { once: true, margin: '0px', amount: 0 })
 
@@ -12,10 +15,10 @@ export default function DashboardPreview() {
     <section className="py-16 px-6 flex justify-center">
       <motion.div
         ref={ref}
-        className="animate-float w-full max-w-2xl"
-        initial={{ opacity: 0, y: 20 }}
-        animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full max-w-2xl"
+        initial={reducedMotion ? false : { opacity: 0, y: 6 }}
+        animate={isInView || reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }}
+        transition={{ duration: reducedMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
       >
         <div
           className="glass-card rounded-2xl p-1 shadow-[0_20px_80px_rgba(190,255,0,0.07)]"

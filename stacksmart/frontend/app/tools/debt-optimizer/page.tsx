@@ -1,5 +1,7 @@
 'use client';
 
+import NumberInput from '@/components/ui/NumberInput';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -398,8 +400,9 @@ export default function DebtOptimizerPage() {
                 <div key={loan.id} className="bg-surface-elevated/30 border border-border-subtle rounded-xl p-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm text-text-muted mb-1">Loan Type</label>
+                      <label htmlFor={`loan-${loan.id}-type`} className="block text-sm text-text-muted mb-1">Loan Type</label>
                       <select
+                        id={`loan-${loan.id}-type`} aria-label="Loan type"
                         value={loan.loan_type}
                         onChange={(e) => updateLoan(loan.id, 'loan_type', e.target.value as LoanType)}
                         className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
@@ -413,9 +416,10 @@ export default function DebtOptimizerPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm text-text-muted mb-1">Loan Name</label>
+                      <label htmlFor={`loan-${loan.id}-name`} className="block text-sm text-text-muted mb-1">Loan Name</label>
                       <input
                         type="text"
+                        id={`loan-${loan.id}-name`} aria-label="Loan name"
                         value={loan.loan_name}
                         onChange={(e) => updateLoan(loan.id, 'loan_name', e.target.value)}
                         className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
@@ -424,10 +428,10 @@ export default function DebtOptimizerPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm text-text-muted mb-1">Amount Owed ($)</label>
-                      <input
-                        type="number"
-                        value={loan.principal || ''}
+                      <label htmlFor={`loan-${loan.id}-principal`} className="block text-sm text-text-muted mb-1">Amount Owed ($)</label>
+                      <NumberInput
+                        type="number" step="0.01"
+                        id={`loan-${loan.id}-principal`} aria-label="Amount owed" stepperLabel="Amount owed" value={loan.principal || ''}
                         onChange={(e) => updateLoan(loan.id, 'principal', parseFloat(e.target.value) || 0)}
                         className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                         placeholder="25000"
@@ -435,11 +439,11 @@ export default function DebtOptimizerPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm text-text-muted mb-1">Interest Rate (%)</label>
-                      <input
+                      <label htmlFor={`loan-${loan.id}-interest`} className="block text-sm text-text-muted mb-1">Interest Rate (%)</label>
+                      <NumberInput
                         type="number"
                         step="0.1"
-                        value={loan.interest_rate || ''}
+                        id={`loan-${loan.id}-interest`} aria-label="Interest rate" stepperLabel="Interest rate" value={loan.interest_rate || ''}
                         onChange={(e) => updateLoan(loan.id, 'interest_rate', parseFloat(e.target.value) || 0)}
                         className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                         placeholder="7.5"
@@ -447,10 +451,10 @@ export default function DebtOptimizerPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm text-text-muted mb-1">Monthly Payment ($)</label>
-                      <input
-                        type="number"
-                        value={loan.minimum_payment || ''}
+                      <label htmlFor={`loan-${loan.id}-payment`} className="block text-sm text-text-muted mb-1">Monthly Payment ($)</label>
+                      <NumberInput
+                        type="number" step="0.01"
+                        id={`loan-${loan.id}-payment`} aria-label="Monthly payment" stepperLabel="Monthly payment" value={loan.minimum_payment || ''}
                         onChange={(e) => updateLoan(loan.id, 'minimum_payment', parseFloat(e.target.value) || 0)}
                         className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                         placeholder="200"
@@ -474,10 +478,10 @@ export default function DebtOptimizerPage() {
           {/* Budget Input */}
           <div className="mt-6 pt-6 border-t border-border-subtle">
             <div>
-              <label className="block text-sm text-text-muted mb-1">Monthly Spare Cash ($)</label>
-              <input
-                type="number"
-                value={monthlyBudget}
+              <label htmlFor="debt-monthly-budget" className="block text-sm text-text-muted mb-1">Monthly Spare Cash ($)</label>
+              <NumberInput
+                type="number" step="0.01"
+                id="debt-monthly-budget" aria-label="Monthly spare cash" stepperLabel="Monthly spare cash" value={monthlyBudget}
                 onChange={(e) => setMonthlyBudget(e.target.value)}
                 className="w-full bg-surface border border-border-subtle rounded-lg px-3 py-2 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                 placeholder="100"
@@ -489,6 +493,7 @@ export default function DebtOptimizerPage() {
           <button
             onClick={handleOptimize}
             disabled={isLoading || loans.length === 0}
+            aria-busy={isLoading}
             className="w-full mt-6 px-6 py-3 btn-gradient disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none rounded-lg font-semibold text-lg flex items-center justify-center gap-2"
           >
             {isLoading && (
@@ -498,13 +503,13 @@ export default function DebtOptimizerPage() {
           </button>
 
           {error && (
-            <div className="mt-4 p-3 bg-surface border-l-4 border-destructive rounded text-destructive text-sm">
+            <div role="alert" className="mt-4 p-3 bg-surface border-l-4 border-destructive rounded text-destructive text-sm">
               {error}
             </div>
           )}
 
           {savedLoansMessage && (
-            <div className="mt-4 p-3 bg-surface border-l-4 border-success rounded text-success text-sm">
+            <div role="status" className="mt-4 p-3 bg-surface border-l-4 border-success rounded text-success text-sm">
               {savedLoansMessage}
             </div>
           )}

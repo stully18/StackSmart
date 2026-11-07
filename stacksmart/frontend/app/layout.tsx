@@ -4,6 +4,7 @@ import './globals.css'
 import { FinancialProvider } from './context/FinancialContext'
 import { AuthProvider } from './context/AuthContext'
 import Navigation from './components/Navigation'
+import MotionPreferences from './components/MotionPreferences'
 import { Analytics } from '@vercel/analytics/react'
 import dynamic from 'next/dynamic'
 
@@ -50,10 +51,12 @@ export default function RootLayout({
       <body className={`${dmSans.className} bg-background min-h-screen`}>
         <AuthProvider>
           <FinancialProvider>
-            <Navigation />
-            {children}
-            <Analytics />
-            <CookieBanner />
+            <MotionPreferences>
+              <Navigation />
+              {children}
+              <Analytics />
+              <CookieBanner />
+            </MotionPreferences>
           </FinancialProvider>
         </AuthProvider>
       </body>

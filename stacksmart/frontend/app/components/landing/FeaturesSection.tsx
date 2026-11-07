@@ -1,5 +1,7 @@
 'use client'
 
+import { useMotionPreference } from '@/app/components/MotionPreferences'
+
 import { useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import { CreditCard, Landmark, ShieldCheck, BarChart3, type LucideIcon } from 'lucide-react'
@@ -38,6 +40,7 @@ const features: Feature[] = [
 ]
 
 export default function FeaturesSection() {
+  const reducedMotion = useMotionPreference()
   const sectionRef = useRef<HTMLDivElement>(null)
   const isInView = useInView(sectionRef, { once: true, margin: '0px', amount: 0 })
 
@@ -58,11 +61,11 @@ export default function FeaturesSection() {
             <motion.div
               key={feature.name}
               className="glass-card rounded-2xl p-6 glow-hover"
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+              initial={reducedMotion ? false : { opacity: 0, y: 6 }}
+              animate={isInView || reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }}
               transition={{
-                duration: 0.5,
-                delay: i * 0.1,
+                duration: reducedMotion ? 0 : 0.2,
+                delay: reducedMotion ? 0 : i * 0.035,
                 ease: [0.22, 1, 0.36, 1],
               }}
             >

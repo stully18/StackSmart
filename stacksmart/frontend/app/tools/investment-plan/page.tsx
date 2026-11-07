@@ -1,5 +1,7 @@
 'use client';
 
+import NumberInput from '@/components/ui/NumberInput';
+
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -95,8 +97,8 @@ export default function InvestmentPlanPage() {
         <form onSubmit={handleSubmit} className="mt-8 rounded-2xl border border-white/10 bg-surface p-5 sm:p-8">
           <label htmlFor="monthly-amount" className="block font-medium text-text-primary">How much can you invest each month?</label>
           <div className="relative mt-3 max-w-sm">
-            <span aria-hidden="true" className="absolute left-4 top-3 text-text-secondary">$</span>
-            <input id="monthly-amount" type="number" min="0.01" max="1000000000" step="0.01" required value={amount}
+            <span aria-hidden="true" className="pointer-events-none absolute z-10 left-4 top-3 text-text-secondary">$</span>
+            <NumberInput stepperLabel="Monthly investment amount" id="monthly-amount" type="number" min="0.01" max="1000000000" step="0.01" required value={amount}
               onChange={event => { setAmount(event.target.value); setPlan(null); }} placeholder="e.g. 500" disabled={loading}
               className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-9 pr-4 text-lg text-text-primary outline-none focus:border-primary disabled:opacity-60" />
           </div>
@@ -125,7 +127,7 @@ export default function InvestmentPlanPage() {
             <p className="mt-2 text-xs text-text-secondary">Include an amount and timeframe for a goal estimate. Use demo details only.</p>
           </div>
           {error && <p role="alert" className="mt-5 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-300">{error}</p>}
-          <button type="submit" disabled={loading} className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-black disabled:opacity-60">
+          <button type="submit" aria-busy={loading} disabled={loading} className="btn-polish min-h-[48px] mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-black disabled:opacity-60">
             {loading && <Loader2 size={18} className="animate-spin" />}
             {loading ? 'Finding your options...' : 'Generate investment options'}
           </button>
@@ -222,7 +224,7 @@ function GrowthTimeline({ projection: p }: { projection: Projection }) {
     <div className="mt-5">
       <p className="text-xs leading-relaxed text-text-secondary">If you keep contributing the same amount: no withdrawals, even after your goal date.</p>
       <div role="group" aria-label="Projection timeframe" className="mt-4 flex flex-wrap gap-2">
-        {choices.map(point => <button key={point.months} type="button" aria-pressed={selected === point.months} onClick={() => setSelected(point.months)} className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${selected === point.months ? 'border-primary/50 bg-primary/10 text-primary' : 'border-white/10 text-text-secondary hover:border-white/30'}`}>{point.months === 0 ? 'Now' : duration(point.months)}{point.months === p.goal_months ? ' · Goal' : ''}</button>)}
+        {choices.map(point => <button key={point.months} type="button" aria-pressed={selected === point.months} onClick={() => setSelected(point.months)} className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${selected === point.months ? 'border-primary/50 bg-primary/10 text-primary' : 'border-white/10 text-text-secondary hover:border-white/30'}`}>{point.months === 0 ? 'Now' : duration(point.months)}{point.months === p.goal_months ? ' (Goal)' : ''}</button>)}
       </div>
       <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.025] p-4" aria-live="polite" aria-atomic="true">
         <p className="text-sm text-text-secondary">{current.months === 0 ? 'Starting balance' : `After ${duration(current.months)}`}</p>

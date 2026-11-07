@@ -97,6 +97,7 @@ export default function FeedbackPanel({ source }: FeedbackPanelProps) {
             <option value="bug">Something broke</option>
           </select>
           <textarea
+            aria-label="Your feedback"
             value={note}
             onChange={(event) => setNote(event.target.value)}
             rows={3}
@@ -108,19 +109,20 @@ export default function FeedbackPanel({ source }: FeedbackPanelProps) {
           <button
             type="submit"
             disabled={isSubmitting || !FORMSPARK_ENDPOINT}
+            aria-busy={isSubmitting}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-gray-900 transition-colors hover:bg-primary-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Send size={16} />
             {isSubmitting ? 'Sending...' : 'Send Feedback'}
           </button>
           {status === 'success' && (
-            <p className="flex items-center gap-2 text-xs font-medium text-primary">
+            <p role="status" className="flex items-center gap-2 text-xs font-medium text-primary">
               <CheckCircle2 size={14} />
               Feedback sent. Thanks for helping improve this beta.
             </p>
           )}
           {status === 'error' && (
-            <p className="flex items-center gap-2 text-xs font-medium text-red-400">
+            <p role="alert" className="flex items-center gap-2 text-xs font-medium text-red-400">
               <XCircle size={14} />
               Feedback did not send. Please try again in a minute.
             </p>

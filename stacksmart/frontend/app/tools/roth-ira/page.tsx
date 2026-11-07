@@ -118,11 +118,11 @@ export default function RothIRAPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="roth-ira-age" className="block text-sm font-medium text-text-secondary mb-2">
                 Your Current Age: {age}
               </label>
               <input
-                type="range"
+                id="roth-ira-age" type="range" aria-label="Current age"
                 min="18"
                 max="30"
                 value={age}
@@ -136,11 +136,11 @@ export default function RothIRAPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="roth-ira-contribution" className="block text-sm font-medium text-text-secondary mb-2">
                 Annual Contribution: ${annualContribution.toLocaleString()}
               </label>
               <input
-                type="range"
+                id="roth-ira-contribution" type="range" aria-label="Annual contribution"
                 min="1000"
                 max="7500"
                 step="500"
@@ -152,11 +152,11 @@ export default function RothIRAPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="roth-ira-retirement-years" className="block text-sm font-medium text-text-secondary mb-2">
                 Years Until Retirement (65): {yearsToRetirement}
               </label>
               <input
-                type="range"
+                id="roth-ira-retirement-years" type="range" aria-label="Years until retirement"
                 min="20"
                 max="50"
                 value={yearsToRetirement}
@@ -166,11 +166,11 @@ export default function RothIRAPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label htmlFor="roth-ira-expected-return" className="block text-sm font-medium text-text-secondary mb-2">
                 Expected Annual Return: {expectedReturn}%
               </label>
               <input
-                type="range"
+                id="roth-ira-expected-return" type="range" aria-label="Expected annual return"
                 min="5"
                 max="12"
                 step="0.5"

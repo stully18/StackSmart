@@ -1,5 +1,7 @@
 'use client';
 
+import NumberInput from '@/components/ui/NumberInput';
+
 import { useState } from 'react';
 import { OptimizationRequest } from '@/types';
 import PlaidLinkButton from './PlaidLinkButton';
@@ -55,13 +57,13 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-text-secondary mb-1">
+          <label htmlFor="snapshot-principal" className="block text-xs font-medium text-text-secondary mb-1">
             Loan Principal ($)
           </label>
-          <input
+          <NumberInput
             type="number"
             step="0.01"
-            value={formData.principal}
+            aria-label="Loan principal" stepperLabel="Loan principal" id="snapshot-principal" value={formData.principal}
             onChange={(e) => setFormData({ ...formData, principal: e.target.value })}
             className="w-full px-3 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
             placeholder="25000"
@@ -70,13 +72,13 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
         </div>
 
         <div className="md:col-span-1">
-          <label className="block text-xs font-medium text-text-secondary mb-1">
+          <label htmlFor="snapshot-interest-rate" className="block text-xs font-medium text-text-secondary mb-1">
             Interest (%)
           </label>
-          <input
+          <NumberInput
             type="number"
             step="0.01"
-            value={formData.interestRate}
+            aria-label="Interest rate" stepperLabel="Interest rate" id="snapshot-interest-rate" value={formData.interestRate}
             onChange={(e) => setFormData({ ...formData, interestRate: e.target.value })}
             className="w-full px-3 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
             placeholder="9.0"
@@ -85,13 +87,13 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
         </div>
 
         <div className="md:col-span-1">
-          <label className="block text-xs font-medium text-text-secondary mb-1">
+          <label htmlFor="snapshot-minimum-payment" className="block text-xs font-medium text-text-secondary mb-1">
             Min Payment/Mo ($)
           </label>
-          <input
+          <NumberInput
             type="number"
             step="0.01"
-            value={formData.minimumPayment}
+            aria-label="Minimum monthly payment" stepperLabel="Minimum monthly payment" id="snapshot-minimum-payment" value={formData.minimumPayment}
             onChange={(e) => setFormData({ ...formData, minimumPayment: e.target.value })}
             className="w-full px-3 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
             placeholder="200"
@@ -100,14 +102,15 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-text-secondary mb-1">
+          <label htmlFor="snapshot-monthly-budget" className="block text-xs font-medium text-text-secondary mb-1">
             Spare Cash/Month ($)
           </label>
           <div className="flex gap-2">
-            <input
+            <NumberInput
+              wrapperClassName="flex-1 min-w-0"
               type="number"
               step="0.01"
-              value={formData.monthlyBudget}
+              aria-label="Spare cash per month" stepperLabel="Spare cash per month" id="snapshot-monthly-budget" value={formData.monthlyBudget}
               onChange={(e) => setFormData({ ...formData, monthlyBudget: e.target.value })}
               className="flex-1 px-3 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
               placeholder="100"
@@ -118,12 +121,12 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
         </div>
 
         <div className="md:col-span-1">
-          <label className="block text-xs font-medium text-text-secondary mb-1">
+          <label htmlFor="snapshot-months-left" className="block text-xs font-medium text-text-secondary mb-1">
             Months Left
           </label>
-          <input
+          <NumberInput
             type="number"
-            value={formData.monthsUntilGraduation}
+            aria-label="Months left" stepperLabel="Months left" id="snapshot-months-left" value={formData.monthsUntilGraduation}
             onChange={(e) => setFormData({ ...formData, monthsUntilGraduation: e.target.value })}
             className="w-full px-3 py-2 bg-surface-elevated/60 border border-border-subtle rounded-lg text-text-primary text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
             placeholder="48"
@@ -136,6 +139,7 @@ export default function InputForm({ onSubmit, isLoading }: InputFormProps) {
         <button
           type="submit"
           disabled={isLoading}
+          aria-busy={isLoading}
           className="flex-1 btn-gradient disabled:bg-surface-elevated disabled:text-text-muted disabled:bg-none disabled:cursor-not-allowed py-3 px-6 rounded-lg"
         >
           {isLoading ? (
