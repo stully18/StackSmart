@@ -293,3 +293,33 @@ def test_disabled_higher_risk_has_more_equity_exposure(provider, monkeypatch):
     higher = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, risk_tolerance="aggressive"))
     equity = lambda plan: sum(item.percentage for item in plan.target_allocation if item.ticker in {"VTI", "VOO", "VXUS"})
     assert equity(higher) > equity(balanced)
+
+
+def test_near_term_goal_uses_savings_even_when_risk_is_high(provider):
+    plan = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, risk_tolerance="aggressive", goal="$20,000 for a car in 2 years"))
+    assert plan.savings_recommendation and plan.target_allocation == []
+    assert provider[0] == []
+    assert plan.projection.goal_months == 24 and plan.projection.goal_amount == 20000
+    assert plan.projection.annual_rate_percent == 3
+    assert plan.projection.monthly_amount == 500
+    assert plan.projected_value_1yr == plan.projection.milestones[0].balance
+    assert plan.projected_value_5yr == plan.projection.milestones[2].balance
+
+
+def test_goal_is_context_not_a_model_projection_request(provider):
+    plan = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, goal="$40,000 for a down payment in 5 years"))
+    call = provider[0][0]
+    payload = json.loads(call["json"]["messages"][1]["content"].split("INPUT_JSON: ")[1])
+    assert payload["user_inputs"]["goal"] == "$40,000 for a down payment in 5 years"
+    properties = call["json"]["tools"][0]["function"]["parameters"]["properties"]
+    assert "projection" not in properties and "goal_balance" not in properties
+    assert plan.projection.goal_point.balance > 30000
+    assert sum(item.monthly_amount for item in plan.target_allocation) == plan.projection.monthly_amount
+
+
+def test_untrusted_model_projection_fields_are_ignored(provider):
+    provider[1](_advice(projection={"goal_point": {"balance": 999999999}}, projected_value_5yr=999999999))
+    plan = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, goal="$40,000 in 5 years"))
+    from app.services.investment_projections import future_value
+    assert plan.projection.goal_point.balance == round(future_value(500, plan.projection.annual_rate_percent / 100, 60), 2)
+    assert plan.projection.goal_point.balance != 999999999

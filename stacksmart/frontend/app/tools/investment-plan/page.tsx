@@ -9,7 +9,23 @@ import { generatePersonalizedPlan } from '@/lib/api';
 import { investmentInputs, type InvestmentRisk as Risk } from '@/lib/investment-inputs';
 import type { SatelliteStockIdea } from '@/types';
 
+interface ProjectionPoint { months: number; balance: number; contributions: number; growth: number }
+interface Projection {
+  annual_rate_percent: number;
+  monthly_amount: number;
+  milestones: ProjectionPoint[];
+  goal_amount: number | null;
+  goal_months: number | null;
+  goal_point: ProjectionPoint | null;
+  shortfall: number | null;
+  required_monthly_amount: number | null;
+  months_to_goal: number | null;
+  parsing_note: string | null;
+  maximum_months: number;
+  assumptions: string;
+}
 interface InvestmentOptions {
+  projection?: Projection | null;
   advisor_summary?: string | null;
   reasoning: string[];
   target_allocation: { ticker: string; name: string; percentage: number; monthly_amount: number; description: string }[];
@@ -30,6 +46,7 @@ export default function InvestmentPlanPage() {
   const { user, session, isLoading: authLoading } = useAuth();
   const [amount, setAmount] = useState('');
   const [risk, setRisk] = useState<Risk | ''>('');
+  const [goal, setGoal] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<InvestmentOptions | null>(null);
@@ -50,7 +67,7 @@ export default function InvestmentPlanPage() {
     setError(null);
     setPlan(null);
     try {
-      const result = await generatePersonalizedPlan(investmentInputs(amount, risk), session.access_token);
+      const result = await generatePersonalizedPlan(investmentInputs(amount, risk, goal), session.access_token);
       setPlan(result);
       setGeneratedRisk(risk || null);
     } catch (err) {
@@ -97,6 +114,14 @@ export default function InvestmentPlanPage() {
               ))}
             </div>
           </fieldset>
+          <div className="mt-7">
+            <label htmlFor="investment-goal" className="block font-medium text-text-primary">What are you saving for? <span className="font-normal text-text-secondary">(optional)</span></label>
+            <textarea id="investment-goal" value={goal} maxLength={500} disabled={loading} rows={2}
+              onChange={event => { setGoal(event.target.value); setPlan(null); }}
+              placeholder="For example: $30,000 for a house down payment in 5 years."
+              className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-text-primary outline-none focus:border-primary disabled:opacity-60" />
+            <p className="mt-2 text-xs text-text-secondary">Include an amount and timeframe for a goal estimate. Use demo details only.</p>
+          </div>
           {error && <p role="alert" className="mt-5 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-300">{error}</p>}
           <button type="submit" disabled={loading} className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-semibold text-black disabled:opacity-60">
             {loading && <Loader2 size={18} className="animate-spin" />}
@@ -114,7 +139,7 @@ export default function InvestmentPlanPage() {
                 <article className="rounded-2xl border border-primary/30 bg-primary/5 p-5 sm:p-6">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <h3 className="text-lg font-semibold text-text-primary">{plan.savings_recommendation.name}</h3>
-                    <p className="font-semibold text-primary">{usd(plan.savings_recommendation.monthly_amount)} / month</p>
+                    <div className="text-right"><p className="font-semibold text-primary">{usd(plan.savings_recommendation.monthly_amount)} / month</p><p className="mt-1 text-sm text-text-secondary">100% of your monthly amount</p></div>
                   </div>
                   <p className="mt-3 text-sm text-text-secondary">{plan.savings_recommendation.reason}</p>
                   <p className="mt-3 text-sm text-text-secondary">{plan.savings_recommendation.risk_note}</p>
@@ -129,7 +154,7 @@ export default function InvestmentPlanPage() {
                   <p className="mt-3 text-sm text-text-secondary">{plan.reasoning.find(reason => reason.startsWith(`${option.ticker}: `))?.slice(option.ticker.length + 2) || option.description}</p>
                 </article>
               ))}
-              {generatedRisk === 'aggressive' && plan.satellite_stock_ideas.slice(0, 1).map(idea => (
+              {generatedRisk === 'aggressive' && !plan.savings_recommendation && plan.satellite_stock_ideas.slice(0, 1).map(idea => (
                 <article key={idea.ticker} className="rounded-2xl border border-amber-400/20 bg-amber-400/5 p-5 sm:p-6">
                   <p className="text-xs font-medium uppercase tracking-wide text-amber-300">Stock to research - separate from your monthly mix</p>
                   <h3 className="mt-2 text-lg font-semibold text-text-primary">{idea.ticker} - {idea.name}</h3>
@@ -139,12 +164,48 @@ export default function InvestmentPlanPage() {
                 </article>
               ))}
             </div>
-            {generatedRisk === 'aggressive' && plan.satellite_stock_ideas.length === 0 && <p className="mt-3 text-sm text-text-secondary">No current verified stock idea is available, so your options use ETFs.</p>}
+            {generatedRisk === 'aggressive' && !plan.savings_recommendation && plan.satellite_stock_ideas.length === 0 && <p className="mt-3 text-sm text-text-secondary">No current verified stock idea is available, so your options use ETFs.</p>}
             {plan.plan_source === 'rule_based' && !plan.savings_recommendation && <p className="mt-3 text-sm text-text-secondary">Showing a rule-based ETF mix; AI generation is currently disabled.</p>}
+            {plan.projection && <ProjectionSection projection={plan.projection} />}
             <p className="mt-5 text-xs leading-relaxed text-text-secondary">Educational examples, not a complete financial plan. ETFs and stocks can lose value. Keep money you need soon in savings.</p>
           </section>
         )}
       </div>
     </main>
+  );
+}
+
+
+function duration(months: number): string {
+  if (months === 0) return 'now';
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  return [years ? `${years} year${years === 1 ? '' : 's'}` : '', rest ? `${rest} month${rest === 1 ? '' : 's'}` : ''].filter(Boolean).join(' ');
+}
+
+function ProjectionSection({ projection: p }: { projection: Projection }) {
+  const points = p.goal_point ? [p.goal_point] : p.milestones;
+  return (
+    <section aria-label="Savings projection" className="mt-7 rounded-2xl border border-white/10 bg-surface p-5 sm:p-6">
+      <h3 className="text-xl font-semibold text-text-primary">What your monthly amount could grow to</h3>
+      <p className="mt-2 text-sm text-text-secondary">Calculated by StackSmart using {usd(p.monthly_amount)} per month and an illustrative {p.annual_rate_percent}% annual rate, compounded monthly.</p>
+      {p.goal_amount !== null && <p className="mt-4 font-medium text-text-primary">Your stated target: {usd(p.goal_amount)}{p.goal_months !== null ? ` ${p.goal_months === 0 ? 'needed now' : `in ${duration(p.goal_months)}`}` : ''}</p>}
+      <div className={`mt-4 grid gap-3 ${points.length > 1 ? 'sm:grid-cols-3' : ''}`}>
+        {points.map(point => (
+          <div key={point.months} className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <p className="text-sm text-text-secondary">{point.months === 0 ? 'Starting balance' : `After ${duration(point.months)}`}</p>
+            <p className="mt-2 text-2xl font-semibold text-primary">{usd(point.balance)}</p>
+            <p className="mt-2 text-xs text-text-secondary">Your deposits: {usd(point.contributions)}</p>
+            <p className="mt-1 text-xs text-text-secondary">Estimated growth: {usd(point.growth)}</p>
+          </div>
+        ))}
+      </div>
+      {p.shortfall !== null && <p className="mt-4 text-sm text-text-primary">{p.goal_months === 0 ? 'New monthly deposits cannot fund a goal needed now.' : p.shortfall > 0 ? `Estimated gap to your target: ${usd(p.shortfall)}.` : 'This illustration reaches your stated savings target within that timeframe.'}</p>}
+      {p.required_monthly_amount !== null && <p className="mt-2 text-sm text-text-secondary">To reach that target on time under the same assumptions: {usd(p.required_monthly_amount)} per month.</p>}
+      {p.goal_amount !== null && <p className="mt-2 text-sm text-text-secondary">{p.months_to_goal !== null ? `Estimated time to save your target at this monthly amount: ${duration(p.months_to_goal)}.` : `Your target is not reached within this ${p.maximum_months / 12}-year illustration.`}</p>}
+      {p.parsing_note && <p className="mt-3 text-xs text-text-secondary">{p.parsing_note}</p>}
+      <details className="mt-4 text-xs text-text-secondary"><summary className="cursor-pointer">How this estimate is calculated</summary><p className="mt-2 leading-relaxed">{p.assumptions}</p></details>
+      <p className="mt-3 text-xs text-text-secondary">Estimates only. Rates can change and investments can lose value. A savings target is not a guarantee that you can afford a purchase.</p>
+    </section>
   );
 }

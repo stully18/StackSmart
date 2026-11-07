@@ -116,10 +116,38 @@ class ETFAllocation(BaseModel):
     description: str
     risk_level: str
 
+class ProjectionPoint(BaseModel):
+    months: int
+    balance: float
+    contributions: float
+    growth: float
+
+
+class InvestmentProjection(BaseModel):
+    annual_rate_percent: float
+    monthly_amount: float
+    milestones: List[ProjectionPoint]
+    goal_amount: Optional[float] = None
+    goal_months: Optional[int] = None
+    goal_point: Optional[ProjectionPoint] = None
+    shortfall: Optional[float] = None
+    required_monthly_amount: Optional[float] = None
+    months_to_goal: Optional[int] = None
+    parsing_note: Optional[str] = None
+    maximum_months: int
+    assumptions: str
+
+
 class SimplePlanRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     monthly_investment_amount: float = Field(ge=0.01, le=1e9)
     risk_tolerance: RiskTolerance
+    goal: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("goal")
+    @classmethod
+    def normalize_goal(cls, value):
+        return value.strip() or None if value is not None else None
 
 
 class SavingsRecommendation(BaseModel):
@@ -157,6 +185,7 @@ class LiquidityNeed(BaseModel):
 
 
 class PersonalizedPlanRequest(BaseModel):
+    goal: Optional[str] = Field(default=None, max_length=500)
     model_config = ConfigDict(allow_inf_nan=False)
     existing_holdings: List[ExistingHolding] = Field(default_factory=list, max_length=20)
     liquidity_needs: List[LiquidityNeed] = Field(default_factory=list, max_length=10)
@@ -226,6 +255,7 @@ class AdvisorAssumptions(BaseModel):
 
 
 class PersonalizedPlanResult(BaseModel):
+    projection: Optional[InvestmentProjection] = None
     savings_recommendation: Optional[SavingsRecommendation] = None
     ai_model: Optional[str] = None
     portfolio_name: str
