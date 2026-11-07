@@ -26,6 +26,10 @@ def test_end_of_month_deposits_and_zero_rate():
 
 @pytest.mark.parametrize("text,amount,months", [
     ('$30,000 for a house down payment in 5 years', 30000, 60),
+    ('30 grand in two years for a down payment on a car', 30000, 24),
+    ('30k in 2 years', 30000, 24),
+    ('$30 grand in 2 years', 30000, 24),
+    ('30 thousand dollars in 2 years', 30000, 24),
     ('A car for $20k within 24 months', 20000, 24),
     ('USD 50000 in two years', 50000, 24),
     ('$1.2 million in 30 years', 1200000, 360),
@@ -93,3 +97,11 @@ def test_zero_rate_required_payment_and_immediate_goal():
 def test_invalid_projection_values_rejected(args):
     with pytest.raises(ValueError):
         future_value(*args)
+
+
+def test_car_goal_recognizes_grand_and_reports_the_real_gap():
+    result = build_projection(1000, .03, "30 grand in two years for a down payment on a car")
+    assert result["goal_amount"] == 30000
+    assert result["goal_point"]["balance"] == 24702.82
+    assert result["shortfall"] == 5297.18
+    assert result["required_monthly_amount"] == 1214.44

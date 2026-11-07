@@ -28,6 +28,7 @@ interface InvestmentOptions {
   projection?: Projection | null;
   advisor_summary?: string | null;
   reasoning: string[];
+  warnings?: string[];
   target_allocation: { ticker: string; name: string; percentage: number; monthly_amount: number; description: string }[];
   savings_recommendation?: { name: string; monthly_amount: number; reason: string; risk_note: string } | null;
   satellite_stock_ideas: SatelliteStockIdea[];
@@ -134,6 +135,8 @@ export default function InvestmentPlanPage() {
           <section aria-label="Your investment options" aria-live="polite" className="mt-9">
             <h2 className="text-2xl font-semibold text-text-primary">Your options</h2>
             <p className="mt-2 text-text-secondary">{plan.advisor_summary}</p>
+            <p className="mt-2 text-xs text-text-secondary">{plan.plan_source === 'ai' ? 'ETF options personalized with AI. Projection math calculated by StackSmart.' : 'Rule-based options. Projection math calculated by StackSmart.'}</p>
+            {plan.warnings?.filter(warning => warning.startsWith('Your goal is within three years.')).map(warning => <p key={warning} className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 text-sm text-amber-200">{warning}</p>)}
             <div className="mt-5 grid gap-4">
               {plan.savings_recommendation && (
                 <article className="rounded-2xl border border-primary/30 bg-primary/5 p-5 sm:p-6">

@@ -22,15 +22,15 @@ class GoalContext:
 def parse_goal(text: str | None) -> GoalContext:
     if not text or not text.strip():
         return GoalContext()
-    money = list(re.finditer(r"(?:\$|\busd\s*)(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s*(thousand|million|k|m)?(?![\w.,])", text, re.I))
+    money = list(re.finditer(r"(?<![\w.,])(?:(?:\$|usd\s*)(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s*(thousand|million|grand|k|m)?|(\d+(?:\.\d{1,2})?)\s*(grand|thousand|million|k|m))(?![\w.,])", text, re.I))
     # A repeated monthly contribution is not the purchase/savings target.
     money = [match for match in money if not re.match(r"\s*(?:/\s*(?:mo(?:nth)?|yr|year)\b|(?:per|a)\s+(?:month|year)\b|monthly\b)", text[match.end():], re.I)]
     amounts = []
     for match in money:
         if text[:match.start()].rstrip().endswith('-'):
             continue
-        scale = {"k": 1000, "thousand": 1000, "m": 1000000, "million": 1000000}.get((match[2] or '').lower(), 1)
-        value = float(match[1].replace(',', '')) * scale
+        scale = {"k": 1000, "thousand": 1000, "grand": 1000, "m": 1000000, "million": 1000000}.get((match[2] or match[4] or '').lower(), 1)
+        value = float((match[1] or match[3]).replace(',', '')) * scale
         if .01 <= value <= 1e12:
             amounts.append(value)
     periods = list(re.finditer(r"(?<![\w.-])(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|a)\s*(years?|yrs?|months?|mos?)\b", text, re.I))
