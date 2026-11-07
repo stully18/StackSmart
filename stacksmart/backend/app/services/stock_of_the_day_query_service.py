@@ -17,9 +17,9 @@ def get_supabase_client() -> Client:
     return create_client(url, key)
 
 
-def get_latest_pick() -> Optional[Dict]:
+def get_latest_pick(*, client: Client | None = None) -> Optional[Dict]:
     """Most recent Stock of the Day pick, or None if the cron job hasn't run yet."""
-    supabase = get_supabase_client()
+    supabase = client if client is not None else get_supabase_client()
     result = (
         supabase.table("stock_of_the_day_picks")
         .select("*")

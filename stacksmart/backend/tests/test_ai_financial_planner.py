@@ -1,11 +1,11 @@
+import json
+from datetime import datetime, timezone, timedelta
 from types import SimpleNamespace
 
 import pytest
-
-from app.models.schemas import ETFAllocation, FinancialGoal, PersonalizedPlanRequest, PersonalizedPlanResult, RiskTolerance
-from app.services import ai_financial_planner
-from app.services.ai_financial_planner import generate_ai_financial_plan
-
+from pydantic import ValidationError
+from app.models.schemas import PersonalizedPlanRequest, PersonalizedPlanResult, ETFAllocation
+from app.services import ai_financial_planner as ai
 
 def _sample_plan() -> PersonalizedPlanResult:
     return PersonalizedPlanResult(
@@ -39,340 +39,231 @@ def _sample_plan() -> PersonalizedPlanResult:
     )
 
 
-def _sample_advice():
-    plan = ai_financial_planner._attach_rule_based_advisor_fields(
-        _sample_plan(), PersonalizedPlanRequest(monthly_investment_amount=500)
-    )
-    return ai_financial_planner.AdvisorResponse.model_validate(plan.model_dump()).model_dump_json()
 
-
-def test_generate_ai_financial_plan_falls_back_when_disabled(monkeypatch):
-    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "false")
-    monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
-    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: pytest.fail("AI disabled: no provider call expected"))
-    result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
-    assert result.plan_source == "rule_based"
-    assert any("AI plan generation is disabled" in warning for warning in result.warnings)
-
-
-def test_generate_ai_financial_plan_raises_without_key_when_enabled(monkeypatch):
-    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "true")
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
-    with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
-        generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+def _advice(**overrides):
+    payload = {
+        "advisor_summary": "Review a diversified long-term plan.",
+        "advisor_cards": [{"title": "Plan", "priority": i, "category": "investing", "recommendation": "Review allocation.", "rationale": "Matches supplied goals.", "action_items": ["Review."]} for i in range(1,7)],
+        "advisor_assumptions": {"confidence": "medium", "data_used": ["risk"], "missing_data": ["tax status"], "caveats": ["Educational."]},
+        "proposed_allocation": [{"ticker": "VTI", "percentage": 60, "reason": "US core."}, {"ticker": "VXUS", "percentage": 20, "reason": "Diversification."}, {"ticker": "BND", "percentage": 20, "reason": "Defensive allocation."}],
+        "stock_idea": None,
+    }
+    return {**payload, **overrides}
 
 
 @pytest.fixture
-def openrouter_setup(monkeypatch):
+def provider(monkeypatch):
     monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "true")
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.delenv("OPENROUTER_FALLBACK_MODEL", raising=False)
-    monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
+    monkeypatch.setenv("OPENROUTER_MODEL", ai.DEFAULT_AI_MODEL)
+    monkeypatch.setattr(ai.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
+    monkeypatch.setattr(ai, "_verified_stock_candidate", lambda: None)
+    monkeypatch.setattr(ai.personalized_planner.market_data_fetcher, "get_cached_etf_data", lambda tickers: {ticker: {"price": 100, "expense_ratio": .03} for ticker in tickers})
+    captured = []
+    def respond(body=None, status=200, format="tool"):
+        def post(url, **kwargs):
+            captured.append({"url": url, **kwargs})
+            args = json.dumps(body if body is not None else _advice())
+            message = {"content": args} if format == "text" else {"tool_calls": [{"function": {"name": "submit_financial_advice", "arguments": args}}]}
+            return SimpleNamespace(ok=status == 200, status_code=status, json=lambda: {"choices": [{"finish_reason": "stop", "message": message}]})
+        monkeypatch.setattr(ai.requests, "post", post)
+    respond()
+    return captured, respond
 
 
-@pytest.mark.parametrize("format", ["json", "fenced", "tool"])
-def test_openrouter_request_and_validated_response(monkeypatch, openrouter_setup, format):
-    captured = {}
-    content = _sample_advice()
-    if format == "fenced":
-        content = "```json\n" + content + "\n```"
-    def post(url, **kwargs):
-        captured.update(url=url, **kwargs)
-        message = {"content": content}
-        if format == "tool":
-            message = {"tool_calls": [{"function": {"name": "submit_financial_advice", "arguments": content}}]}
-        return SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "tool_calls" if format == "tool" else "stop", "message": message}]})
-    monkeypatch.setattr(ai_financial_planner.requests, "post", post)
-    result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
-    assert result.plan_source == "ai"
-    assert captured["url"] == "https://openrouter.ai/api/v1/chat/completions"
-    assert captured["headers"]["Authorization"] == "Bearer test-key"
-    assert captured["json"]["model"] == ai_financial_planner.DEFAULT_AI_MODEL
-    assert captured["json"]["provider"]["max_price"] == {"prompt": 0, "completion": 0}
-    assert "models" not in captured["json"]
-    assert captured["json"]["tool_choice"]["function"]["name"] == "submit_financial_advice"
-    assert captured["json"]["reasoning"] == {"enabled": False}
-    assert captured["json"]["tools"][0]["function"]["parameters"]["required"]
-    assert result.target_allocation == _sample_plan().target_allocation
-    assert result.projected_value_30yr == _sample_plan().projected_value_30yr
-    assert captured["timeout"] == (10, 45)
+@pytest.mark.parametrize("format", ["tool", "text"])
+def test_exact_free_model_and_validated_allocation(provider, format):
+    captured, respond = provider
+    respond(format=format)
+    result = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    request = captured[0]
+    assert request["url"] == ai.OPENROUTER_URL
+    assert request["json"]["model"] == ai.DEFAULT_AI_MODEL
+    assert request["json"]["provider"]["max_price"] == {"prompt": 0, "completion": 0}
+    assert request["json"]["tool_choice"]["function"]["name"] == "submit_financial_advice"
+    assert request["json"]["reasoning"] == {"enabled": False}
+    assert request["timeout"] == (5, 60)
+    assert [item.ticker for item in result.target_allocation] == ["VTI", "VXUS", "BND"]
+    assert sum(item.monthly_amount for item in result.target_allocation) == 500
+    assert result.stock_idea_status == "unavailable"
+    assert result.ai_model == ai.DEFAULT_AI_MODEL
 
 
-@pytest.mark.parametrize("body", [
-    {"error": {"message": "provider failure"}},
-    {"choices": []},
-    {"choices": [{"finish_reason": "length", "message": {"content": "{}"}}]},
-    {"choices": [{"finish_reason": "stop", "message": {"content": None}}]},
-    {"choices": [{"finish_reason": "stop", "message": {"content": "not JSON"}}]},
-    {"choices": [{"finish_reason": "stop", "message": {"content": "{}"}}]},
+@pytest.mark.parametrize("allocation", [
+    [{"ticker":"BAD", "percentage":100, "reason":"Invalid."}],
+    [{"ticker":"VTI", "percentage":60,"reason":"Core."}, {"ticker":"VTI", "percentage":40,"reason":"Duplicate."}],
+    [{"ticker":"VTI", "percentage":60,"reason":"Core."}, {"ticker":"VOO", "percentage":40,"reason":"Overlap."}],
+    [{"ticker":"VTI", "percentage":99,"reason":"Bad total."}],
+    [{"ticker":"VTI", "percentage":float("nan"),"reason":"Nonfinite."}],
 ])
-def test_invalid_provider_response_raises(monkeypatch, openrouter_setup, body):
-    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=True, json=lambda: body))
-    with pytest.raises(RuntimeError, match="invalid or incomplete"):
-        generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+def test_invalid_etf_output_is_rejected(provider, allocation):
+    provider[1](_advice(proposed_allocation=allocation))
+    with pytest.raises(ai.AIPlanError, match="invalid or incomplete"):
+        ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
 
 
-@pytest.mark.parametrize("status", [401, 429, 503])
-def test_provider_http_errors_do_not_expose_body(monkeypatch, openrouter_setup, status):
-    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=False, status_code=status, text="secret provider details"))
-    with pytest.raises(RuntimeError, match="rate-limited" if status == 429 else f"HTTP {status}") as error:
-        generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
-    assert "secret" not in str(error.value)
+def test_short_horizon_constraints_are_enforced(provider):
+    with pytest.raises(ai.AIPlanError):
+        ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500,time_horizon_years=2,risk_tolerance="aggressive"))
+    provider[1](_advice(proposed_allocation=[{"ticker":"SGOV","percentage":100,"reason":"Short timeline."}]))
+    result = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500,time_horizon_years=2))
+    assert result.target_allocation[0].ticker == "SGOV"
 
 
-def test_provider_timeout_raises(monkeypatch, openrouter_setup):
-    def post(*args, **kwargs):
-        raise ai_financial_planner.requests.Timeout("secret request details")
-    monkeypatch.setattr(ai_financial_planner.requests, "post", post)
-    with pytest.raises(RuntimeError, match="took too long") as error:
-        generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
-    assert "secret" not in str(error.value)
+def test_current_context_changes_each_request_and_holdings_are_not_added_twice(provider):
+    for amount in (100, 500):
+        request = PersonalizedPlanRequest(monthly_investment_amount=amount,current_savings=1000,
+            existing_holdings=[{"ticker":"vti", "current_value":1000}])
+        result = ai.generate_ai_financial_plan(request)
+        expected = ai.personalized_planner.calculate_future_value(1000,amount,result.expected_annual_return/100,1)
+        assert result.projected_value_1yr == round(expected,2)
+    inputs = [json.loads(call["json"]["messages"][1]["content"].split("INPUT_JSON: ")[1])["user_inputs"] for call in provider[0]]
+    assert [item["monthly_investment_amount"] for item in inputs] == [100,500]
+    assert inputs[0]["existing_holdings"][0]["ticker"] == "VTI"
 
 
-def test_personalized_plan_result_accepts_advisor_dashboard_fields():
-    from app.models.schemas import PersonalizedPlanResult
-
-    payload = {
-        "portfolio_name": "AI Goal-Based Growth Plan",
-        "risk_profile": "Aggressive, goal-aware",
-        "target_allocation": [],
-        "monthly_investment_breakdown": {},
-        "projected_value_1yr": 12000,
-        "projected_value_5yr": 80000,
-        "projected_value_10yr": 210000,
-        "projected_value_20yr": 800000,
-        "projected_value_30yr": 1800000,
-        "expected_annual_return": 8.1,
-        "portfolio_expense_ratio": 0.05,
-        "rebalancing_frequency": "Quarterly",
-        "reasoning": ["Goal and risk tolerance support growth tilt."],
-        "next_steps": ["Automate monthly investing."],
-        "warnings": ["Educational guidance only."],
-        "advisor_summary": "Prioritize investing while keeping liquidity safe.",
-        "advisor_cards": [
-            {
-                "title": "Investing Priority",
-                "priority": 1,
-                "category": "investing",
-                "recommendation": "Invest most of the monthly surplus into diversified ETFs.",
-                "rationale": "The user selected aggressive risk and income generation.",
-                "action_items": ["Set up recurring contributions."],
-                "monthly_amount": 800,
-                "confidence": "high",
-            }
-        ],
-        "monthly_action_plan": {
-            "available_monthly_amount": 1000,
-            "etf_investing_amount": 800,
-            "debt_extra_payment_amount": 100,
-            "emergency_fund_amount": 100,
-            "notes": ["Only shown because income/expense context exists."],
-        },
-        "satellite_stock_ideas": [
-            {
-                "ticker": "AAPL",
-                "name": "Apple Inc.",
-                "allocation_percent": 3,
-                "monthly_amount": 30,
-                "reason": "Optional satellite exposure, not core allocation.",
-                "risk_note": "Single-stock risk; cap total satellite exposure.",
-            }
-        ],
-        "advisor_assumptions": {
-            "confidence": "medium",
-            "data_used": ["loans", "income", "goal", "emergency fund"],
-            "missing_data": ["tax filing status"],
-            "caveats": ["No professional advice."],
-        },
-        "plan_source": "ai",
-    }
-
-    result = PersonalizedPlanResult.model_validate(payload)
-
-    assert result.advisor_summary.startswith("Prioritize")
-    assert result.advisor_cards[0].priority == 1
-    assert result.monthly_action_plan.etf_investing_amount == 800
-    assert result.satellite_stock_ideas[0].allocation_percent == 3
-    assert result.advisor_assumptions.confidence == "medium"
-    assert result.plan_source == "ai"
-
-
-def test_ai_disabled_returns_rule_based_dashboard_fields(monkeypatch):
-    from app.models.schemas import FinancialGoal, PersonalizedPlanRequest, RiskTolerance
-    from app.services.ai_financial_planner import generate_ai_financial_plan
-
-    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "false")
-    monkeypatch.setattr(ai_financial_planner.personalized_planner, "generate_personalized_plan", lambda request: _sample_plan())
-
-    request = PersonalizedPlanRequest(
-        monthly_investment_amount=1000,
-        risk_tolerance=RiskTolerance.AGGRESSIVE,
-        financial_goal=FinancialGoal.INCOME_GENERATION,
-        current_savings=5000,
-        has_emergency_fund=False,
-        monthly_gross_income=5000,
-        monthly_expenses=3200,
-        current_emergency_fund=1000,
-        emergency_fund_months_target=3,
-        loans=[],
-    )
-
-    result = generate_ai_financial_plan(request)
-
-    assert result.plan_source == "rule_based"
-    assert result.advisor_summary
-    assert len(result.advisor_cards) >= 6
-    assert any(card.category == "etf_allocation" for card in result.advisor_cards)
-    assert any(card.category == "emergency_fund" for card in result.advisor_cards)
-    assert result.advisor_assumptions is not None
-    assert "rule-based" in " ".join(result.warnings or []).lower()
-
-
-def test_ai_prompt_contains_financial_context_without_requiring_calculation_output():
-    request = PersonalizedPlanRequest(monthly_investment_amount=300, notes="Synthetic goal", monthly_expenses=1000)
-    payload = ai_financial_planner._request_payload(request, _sample_plan())
-    assert payload["user_inputs"]["monthly_investment_amount"] == 300
-    assert payload["user_inputs"]["notes"] == "Synthetic goal"
-    assert "allocation" in payload["deterministic_baseline"]
-    assert "projected_value_30yr" not in payload["deterministic_baseline"]
-    schema = ai_financial_planner.AdvisorResponse.model_json_schema()
-    assert "target_allocation" not in schema["properties"]
-    assert schema["properties"]["advisor_cards"]["minItems"] == 6
-
-
-def test_sanitize_ai_plan_sets_source_and_limits_satellite_stock_exposure():
-    from app.models.schemas import (
-        AdvisorCard,
-        PersonalizedPlanResult,
-        SatelliteStockIdea,
-    )
-    from app.services.ai_financial_planner import _sanitize_plan
-
-    baseline = PersonalizedPlanResult(
-        portfolio_name="Baseline",
-        risk_profile="Moderate",
-        target_allocation=[],
-        monthly_investment_breakdown={"VOO": 1000},
-        projected_value_1yr=1,
-        projected_value_5yr=5,
-        projected_value_10yr=10,
-        projected_value_20yr=20,
-        projected_value_30yr=30,
-        expected_annual_return=7,
-        portfolio_expense_ratio=0.05,
-        rebalancing_frequency="Quarterly",
-        reasoning=["baseline"],
-        next_steps=["baseline"],
-    )
-    ai_plan = baseline.model_copy(deep=True)
-    ai_plan.advisor_cards = [
-        AdvisorCard(
-            title="Investing",
-            priority=1,
-            category="investing",
-            recommendation="Invest monthly.",
-            rationale="Goal supports growth.",
-        )
-    ]
-    ai_plan.satellite_stock_ideas = [
-        SatelliteStockIdea(
-            ticker="XYZ",
-            name="Example",
-            allocation_percent=25,
-            monthly_amount=250,
-            reason="Too much risk",
-            risk_note="High concentration risk",
-        )
-    ]
-
-    result = _sanitize_plan(ai_plan, baseline)
-
-    assert result.plan_source == "ai"
-    assert len(result.advisor_cards) >= 6
-    assert result.satellite_stock_ideas[0].allocation_percent <= 10
-    assert result.satellite_stock_ideas[0].monthly_amount <= 100
-    assert any("educational" in warning.lower() for warning in result.warnings)
-
-
-@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf"), None])
-def test_nonfinite_market_data_can_be_persisted_as_json(monkeypatch, invalid):
-    import json
-    from app.services import personalized_planner
-    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS", "false")
-    monkeypatch.setattr(personalized_planner.market_data_fetcher, "get_multiple_etf_data", lambda tickers: {
-        ticker: {"price": invalid, "expense_ratio": invalid, "ytd_return": invalid, "one_year_return": invalid}
-        for ticker in tickers
-    })
-    plan = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=300))
-    json.dumps(plan.model_dump(mode="json"), allow_nan=False)
-    assert all(etf.current_price > 0 for etf in plan.target_allocation)
-    assert all(etf.ytd_return is None and etf.one_year_return is None for etf in plan.target_allocation)
-    assert any("illustrative fallback" in warning for warning in plan.warnings)
-
-
-def test_zero_market_returns_are_preserved(monkeypatch):
-    from app.services import personalized_planner
-    monkeypatch.setattr(personalized_planner.market_data_fetcher, "get_multiple_etf_data", lambda tickers: {
-        ticker: {"price": 100, "expense_ratio": 0, "ytd_return": 0, "one_year_return": 0}
-        for ticker in tickers
-    })
-    plan = personalized_planner.generate_personalized_plan(PersonalizedPlanRequest(monthly_investment_amount=300))
-    assert all(etf.ytd_return == 0 and etf.one_year_return == 0 and etf.expense_ratio == 0 for etf in plan.target_allocation)
-
-
-def test_ai_cannot_override_the_calculated_monthly_budget(monkeypatch, openrouter_setup):
-    import json
-    advice = json.loads(_sample_advice())
-    advice["monthly_action_plan"] = {"etf_investing_amount": 9000, "debt_extra_payment_amount": 9000, "emergency_fund_amount": 9000}
-    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": json.dumps(advice)}}]}))
-    result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, monthly_expenses=1000))
+def test_liquidity_budget_and_projection_use_one_cash_reserve(provider):
+    result = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500,current_savings=1000,
+        liquidity_needs=[{"amount":3400,"months_until_needed":12,"purpose":"Tuition"}]))
     action = result.monthly_action_plan
-    assert action.available_monthly_amount == 500
-    assert action.etf_investing_amount + action.debt_extra_payment_amount + action.emergency_fund_amount == 500
-    assert action.emergency_fund_amount == 500
-    schema = ai_financial_planner.AdvisorResponse.model_json_schema()
-    assert "monthly_action_plan" not in schema["properties"]
-    assert "monthly_amount" not in schema["$defs"]["AdviceCard"]["properties"]
+    assert action.liquidity_savings_amount == 200
+    assert action.etf_investing_amount == 300
+    assert sum(item.monthly_amount for item in result.target_allocation) == 300
+    assert action.etf_investing_amount + action.emergency_fund_amount + action.debt_extra_payment_amount + action.liquidity_savings_amount == 500
+    assert result.projected_value_1yr == round(ai.personalized_planner.calculate_future_value(0,300,result.expected_annual_return/100,1),2)
 
 
-@pytest.mark.parametrize("failure", ["timeout", "invalid"])
-def test_free_fallback_uses_correct_request_and_preserves_calculations(monkeypatch, openrouter_setup, failure):
-    monkeypatch.setenv("OPENROUTER_FALLBACK_MODEL", "openrouter/free")
-    calls = []
-    def post(url, **kwargs):
+def test_dollars_reconcile_to_the_cent(provider):
+    provider[1](_advice(proposed_allocation=[{"ticker":"VTI","percentage":33.33,"reason":"Core."},{"ticker":"VXUS","percentage":33.33,"reason":"International."},{"ticker":"BND","percentage":33.34,"reason":"Bonds."}]))
+    result = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=100.01))
+    assert sum(round(item.monthly_amount*100) for item in result.target_allocation) == 10001
+
+
+def test_only_verified_stock_is_used_without_budget(provider, monkeypatch):
+    candidate = {"ticker":"NVDA","name":"NVIDIA Corporation","sector":"Technology","as_of":"2026-11-06","supporting_context":"Dated screen selected this company."}
+    monkeypatch.setattr(ai,"_verified_stock_candidate",lambda:candidate)
+    provider[1](_advice(stock_idea={"ticker":"NVDA","reason":"Screen selected it.","risk_note":"Concentration risk."}))
+    plan = ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    idea = plan.satellite_stock_ideas[0]
+    assert idea.allocation_percent == idea.monthly_amount == 0
+    assert idea.sector == "Technology" and plan.stock_idea_status == "available"
+    provider[1](_advice(stock_idea={"ticker":"AAPL","reason":"Wrong pick.","risk_note":"Risk."}))
+    with pytest.raises(ai.AIPlanError):
+        ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+
+
+@pytest.mark.parametrize("status", [401,429,503])
+def test_provider_errors_have_safe_category_and_reference(provider,status):
+    provider[1](status=status)
+    with pytest.raises(ai.AIPlanError) as caught:
+        ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    assert caught.value.reference and caught.value.category.startswith("provider_")
+    assert "test-key" not in str(caught.value)
+
+
+def test_timeout_has_no_alternate_model_retry(provider,monkeypatch):
+    monkeypatch.setenv("OPENROUTER_FALLBACK_MODEL","paid/other")
+    calls=[]
+    def fail(*args,**kwargs):
         calls.append(kwargs)
-        if len(calls) == 1:
-            if failure == "timeout":
-                raise ai_financial_planner.requests.Timeout()
-            return SimpleNamespace(ok=True, json=lambda: {"choices": []})
-        return SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": _sample_advice()}}]})
-    monkeypatch.setattr(ai_financial_planner.requests, "post", post)
-    plan = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
-    assert calls[0]["json"]["model"] == ai_financial_planner.DEFAULT_AI_MODEL
-    assert calls[0]["timeout"] == (10, 20)
-    assert calls[1]["json"]["model"] == "openrouter/free"
-    assert calls[1]["timeout"] == (10, 40)
-    assert calls[1]["json"]["reasoning"] == {"enabled": False}
-    assert calls[1]["json"]["provider"]["max_price"] == {"prompt": 0, "completion": 0}
-    assert plan.ai_model == "openrouter/free"
-    assert plan.target_allocation == _sample_plan().target_allocation
-    assert any("free fallback" in warning for warning in plan.warnings)
+        raise ai.requests.Timeout("secret data")
+    monkeypatch.setattr(ai.requests,"post",fail)
+    with pytest.raises(ai.AIPlanError,match="timeout") as caught:
+        ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    assert len(calls)==1 and "secret" not in str(caught.value)
 
 
-def test_monthly_advice_keeps_portfolio_dollars_and_projections_consistent(monkeypatch, openrouter_setup):
-    monkeypatch.setattr(ai_financial_planner.requests, "post", lambda *a, **k: SimpleNamespace(ok=True, json=lambda: {"choices": [{"finish_reason": "stop", "message": {"content": _sample_advice()}}]}))
-    result = generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500, monthly_expenses=1000, current_emergency_fund=2000))
-    assert sum(etf.monthly_amount for etf in result.target_allocation) == 333.33
-    assert result.monthly_investment_breakdown == {"VOO": 333.33}
-    assert result.monthly_action_plan.emergency_fund_amount == 166.67
-    expected = ai_financial_planner.personalized_planner.calculate_future_value(0, 333.33, 0.08, 30)
-    assert result.projected_value_30yr == round(expected, 2)
+@pytest.mark.parametrize("payload", [
+    {"monthly_investment_amount":float("inf")},
+    {"monthly_investment_amount":500,"existing_holdings":[{"ticker":"VTI","current_value":1}]},
+    {"monthly_investment_amount":500,"liquidity_needs":[{"amount":20,"months_until_needed":1.5,"purpose":"Goal"}]},
+])
+def test_invalid_user_financial_inputs_rejected(payload):
+    with pytest.raises(ValidationError):
+        PersonalizedPlanRequest(**payload)
 
 
-def test_monthly_split_prioritizes_expensive_debt_after_emergency_savings():
-    request = PersonalizedPlanRequest(monthly_investment_amount=300, has_emergency_fund=True, loans=[{"loan_type":"credit_card","loan_name":"Synthetic","principal":5000,"interest_rate":0.22,"minimum_payment":100}])
-    action = ai_financial_planner._monthly_action_plan(request)
-    assert action.debt_extra_payment_amount == 300
-    assert action.etf_investing_amount == 0
-    assert action.emergency_fund_amount == 0
+def test_disabled_rulebased_still_preserves_liquidity(provider,monkeypatch):
+    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS","false")
+    plan=ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500,time_horizon_years=2,
+        liquidity_needs=[{"amount":100,"months_until_needed":0,"purpose":"Now"}]))
+    assert plan.plan_source == "rule_based"
+    assert plan.target_allocation[0].ticker == "SGOV"
+    assert plan.monthly_action_plan.etf_investing_amount == 400
+
+
+@pytest.mark.parametrize("body",[{"error":{"message":"secret"}},{"choices":[]},{"choices":[{"finish_reason":"length","message":{"content":"{}"}}]},{"choices":[{"finish_reason":"stop","message":{"content":"not JSON"}}]}])
+def test_malformed_or_truncated_provider_responses(provider,monkeypatch,body):
+    monkeypatch.setattr(ai.requests,"post",lambda *args,**kwargs:SimpleNamespace(ok=True,json=lambda:body))
+    with pytest.raises(ai.AIPlanError,match="invalid or incomplete"):
+        ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+
+
+def test_stale_future_and_unknown_stock_candidates_are_unavailable(monkeypatch):
+    monkeypatch.setattr(ai,"get_planning_storage_client",lambda:object())
+    today=datetime.now(timezone.utc).date()
+    for pick in [None,{"ticker":"UNKNOWN","pick_date":today.isoformat()},
+                 {"ticker":"NVDA","pick_date":(today-timedelta(days=8)).isoformat()},
+                 {"ticker":"NVDA","pick_date":(today+timedelta(days=1)).isoformat()}]:
+        monkeypatch.setattr(ai.stock_of_the_day_query_service,"get_latest_pick",lambda **kwargs:pick)
+        assert ai._verified_stock_candidate() is None
+    monkeypatch.setattr(ai.stock_of_the_day_query_service,"get_latest_pick",lambda **kwargs:{"ticker":"NVDA","pick_date":today.isoformat(),"composite_score":1.2,"factor_breakdown":{"momentum":{"raw_value":.2}}})
+    candidate=ai._verified_stock_candidate()
+    assert candidate["ticker"]=="NVDA" and candidate["as_of"]==today.isoformat()
+
+
+def test_demo_returns_are_not_displayed_as_live_results(provider,monkeypatch):
+    monkeypatch.setattr(ai.personalized_planner.market_data_fetcher,"get_cached_etf_data",lambda tickers:{ticker:{"price":100,"data_source":"Demo Mode","ytd_return":25,"one_year_return":25} for ticker in tickers})
+    plan=ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    assert all(item.ytd_return is None and item.one_year_return is None for item in plan.target_allocation)
+    assert any("illustrative" in warning for warning in plan.warnings)
+
+
+@pytest.mark.parametrize("field,value",[("principal",float("inf")),("minimum_payment",float("nan")),("principal",1e13),("loan_name","x"*121),("term_months",1201)])
+def test_planning_loan_fields_are_finite_and_bounded(field,value):
+    loan={"principal":1000,"minimum_payment":20,"interest_rate":.05,field:value}
+    with pytest.raises(ValidationError):
+        PersonalizedPlanRequest(monthly_investment_amount=500,loans=[loan])
+
+
+def test_planning_loan_count_is_bounded():
+    with pytest.raises(ValidationError):
+        PersonalizedPlanRequest(monthly_investment_amount=500,loans=[{"principal":1000,"minimum_payment":20,"interest_rate":.05}]*51)
+
+
+def test_capital_preservation_rejects_equity_only_even_at_long_horizon(provider):
+    provider[1](_advice(proposed_allocation=[{"ticker":"VTI","percentage":80,"reason":"Core."},{"ticker":"VXUS","percentage":20,"reason":"International."}]))
+    with pytest.raises(ai.AIPlanError):
+        ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500,financial_goal="capital_preservation",time_horizon_years=10))
+
+
+def test_disabled_fallback_is_goal_sensitive_and_debt_freedom_prioritizes_lower_rate_debt(provider,monkeypatch):
+    monkeypatch.setenv("ENABLE_AI_FINANCIAL_PLANS","false")
+    building=ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500,financial_goal="wealth_building"))
+    preservation=ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500,financial_goal="capital_preservation"))
+    defensive=lambda plan:sum(item.percentage for item in plan.target_allocation if item.ticker in {"BND","SGOV"})
+    assert defensive(preservation)>=80 and defensive(preservation)>defensive(building)
+    request=PersonalizedPlanRequest(monthly_investment_amount=500,financial_goal="debt_freedom",has_emergency_fund=True,
+        loans=[{"principal":1000,"minimum_payment":20,"interest_rate":.03}])
+    action=ai._monthly_action_plan(request)
+    assert action.debt_extra_payment_amount==500 and action.etf_investing_amount==0
+
+
+def test_generation_never_downloads_live_quotes(provider,monkeypatch):
+    monkeypatch.setattr(ai.personalized_planner.market_data_fetcher,"get_multiple_etf_data",lambda *args:pytest.fail("No live quote jobs during generation"))
+    monkeypatch.setattr(ai.personalized_planner.market_data_fetcher,"get_cached_etf_data",lambda *args:{})
+    plan=ai.generate_ai_financial_plan(PersonalizedPlanRequest(monthly_investment_amount=500))
+    assert any("illustrative" in warning for warning in plan.warnings)
+    assert all(item.current_price>0 for item in plan.target_allocation)
+
+
+def test_planning_storage_transport_is_short_and_disables_retries(monkeypatch):
+    from app.services import planning_storage
+    captured={}
+    monkeypatch.setattr(planning_storage,"create_client",lambda *args,**kwargs:captured.update(kwargs) or object())
+    planning_storage.get_supabase_client()
+    options=captured["options"]
+    assert options.postgrest_client_timeout==5
+    if hasattr(options,"postgrest_client_retry"):
+        assert options.postgrest_client_retry is False
+    assert options.auto_refresh_token is False

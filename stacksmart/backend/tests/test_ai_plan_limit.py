@@ -1,200 +1,50 @@
-"""Tests for app.services.ai_plan_limit.
-
-Exercises the daily 10-generations-per-user-per-UTC-day enforcement without
-touching a real Supabase instance. The Supabase client is replaced by an
-in-memory stub via the `patched_supabase` fixture (see conftest.py).
-
-These are plain synchronous pytest functions: the async service functions are
-driven with asyncio.run so the suite needs no extra pytest plugins.
-"""
-
-from __future__ import annotations
-
+"""Generation tracking is unlimited and excludes duplicate financial snapshots."""
 import asyncio
-import pytest
-
-from app.services.ai_plan_limit import (
-    DAILY_AI_PLAN_LIMIT,
-    DailyPlanLimitExceeded,
-    complete_daily_generation,
-    get_today_generation,
-    get_today_generations,
-    release_failed_generation,
-    reserve_daily_generation,
-    today_utc,
-)
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
+from unittest.mock import patch
+from app.services import ai_plan_limit as audit
 
 
-def test_today_utc_returns_iso_date():
-    value = today_utc()
-    # YYYY-MM-DD per date.isoformat()
-    assert len(value) == 10 and value[4] == "-" and value[7] == "-"
-    assert "T" not in value  # must be a bare date, not a datetime
+def test_more_than_ten_uuid_records_without_financial_snapshots(patched_supabase):
+    ids=[]
+    for _ in range(15):
+        identifier=asyncio.run(audit.reserve_daily_generation("user-a","nemotron",{"private":"finance"}))
+        ids.append(identifier)
+        asyncio.run(audit.complete_daily_generation(identifier,{"private":"advice","ai_model":"nemotron"}))
+    assert len(set(ids))==15
+    inserts=[call["payload"] for call in patched_supabase.calls if call["method"]=="insert"]
+    assert all(row["request_payload"]=={} and "generation_number" not in row for row in inserts)
+    updates=[call["payload"] for call in patched_supabase.calls if call["method"]=="update"]
+    assert all("response_payload" not in row for row in updates)
 
 
-def test_reserve_creates_row_with_user_and_today(patched_supabase):
-    generation_id = asyncio.run(
-        reserve_daily_generation(
-            user_id="user-123",
-            model="nvidia/nemotron-3-ultra-550b-a55b:free",
-            request_payload={"monthly_investment_amount": 500},
-        )
-    )
-
-    assert generation_id  # returns the generated uuid string
-    inserts = [c for c in patched_supabase.calls if c["method"] == "insert"]
-    assert len(inserts) == 1
-    row = inserts[0]["payload"]
-    assert row["user_id"] == "user-123"
-    assert row["generated_on"] == today_utc()
-    assert row["status"] == "pending"
-    assert row["provider"] == "openrouter"
-    assert row["model"] == "nvidia/nemotron-3-ultra-550b-a55b:free"
-    assert row["generation_number"] == 1
-    assert row["request_payload"] == {"monthly_investment_amount": 500}
-    # id must be present and equal the returned id
-    assert row["id"] == generation_id
+def test_concurrent_generations_do_not_share_numbered_slots(patched_supabase):
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        ids=list(pool.map(lambda _:asyncio.run(audit.reserve_daily_generation("user-a","nemotron",{})),range(24)))
+    assert len(set(ids))==24
 
 
-def test_reserve_uses_next_available_generation_slot(patched_supabase):
-    patched_supabase.set_today_rows([
-        {"generation_number": 1, "status": "completed"},
-        {"generation_number": 2, "status": "completed"},
-    ])
-
-    asyncio.run(
-        reserve_daily_generation(
-            user_id="user-123", model="nvidia/nemotron-3-ultra-550b-a55b:free", request_payload={}
-        )
-    )
-
-    inserts = [c for c in patched_supabase.calls if c["method"] == "insert"]
-    assert inserts[0]["payload"]["generation_number"] == 3
+def test_failed_generation_retains_safe_metadata(patched_supabase):
+    asyncio.run(audit.release_failed_generation("id","secret financial inputs"))
+    update=[call["payload"] for call in patched_supabase.calls if call["method"]=="update"][0]
+    assert update["status"]=="failed" and update["error_message"]=="generation_failed"
+    assert not any(call["method"]=="delete" for call in patched_supabase.calls)
 
 
-def test_reserve_raises_daily_limit_exceeded_at_ten_generations(patched_supabase):
-    patched_supabase.set_today_rows([
-        {"generation_number": number, "status": "completed"}
-        for number in range(1, DAILY_AI_PLAN_LIMIT + 1)
-    ])
-
-    with pytest.raises(DailyPlanLimitExceeded) as exc_info:
-        asyncio.run(
-            reserve_daily_generation(
-                user_id="user-123", model="nvidia/nemotron-3-ultra-550b-a55b:free", request_payload={}
-            )
-        )
-    assert "10 ai plans" in str(exc_info.value).lower()
-
-
-def test_reserve_duplicate_key_retries_next_slot(patched_supabase):
-    from tests.conftest import make_api_error
-
-    patched_supabase.set_insert_error(make_api_error())
-
-    with pytest.raises(DailyPlanLimitExceeded) as exc_info:
-        asyncio.run(
-            reserve_daily_generation(
-                user_id="user-123", model="nvidia/nemotron-3-ultra-550b-a55b:free", request_payload={}
-            )
-        )
-    assert "10 ai plans" in str(exc_info.value).lower()
-
-
-def test_reserve_other_api_error_is_reraised(patched_supabase):
-    from postgrest.exceptions import APIError
-
-    patched_supabase.set_insert_error(
-        APIError({"message": "connection refused", "code": "XX000"})
-    )
-
-    with pytest.raises(APIError):
-        asyncio.run(
-            reserve_daily_generation(
-                user_id="user-123", model="nvidia/nemotron-3-ultra-550b-a55b:free", request_payload={}
-            )
-        )
-
-
-def test_complete_updates_status_and_payload(patched_supabase):
-    asyncio.run(
-        complete_daily_generation(
-            generation_id="gen-1",
-            response_payload={"portfolio_name": "Test Plan", "warnings": []},
-        )
-    )
-
-    updates = [c for c in patched_supabase.calls if c["method"] == "update"]
-    assert len(updates) == 1
-    payload = updates[0]["payload"]
-    assert payload["status"] == "completed"
-    assert payload["response_payload"]["portfolio_name"] == "Test Plan"
-    assert payload["completed_at"]
-
-
-def test_release_failed_marks_and_deletes(patched_supabase):
-    asyncio.run(release_failed_generation(generation_id="gen-1", error_message="boom"))
-
-    updates = [c for c in patched_supabase.calls if c["method"] == "update"]
-    deletes = [c for c in patched_supabase.calls if c["method"] == "delete"]
-    assert len(updates) == 1
-    assert updates[0]["payload"]["status"] == "failed"
-    assert updates[0]["payload"]["error_message"] == "boom"
-    assert len(deletes) == 1
-
-
-def test_release_failed_truncates_long_error_message(patched_supabase):
-    long_message = "x" * 2000
-    asyncio.run(
-        release_failed_generation(generation_id="gen-1", error_message=long_message)
-    )
-
-    updates = [c for c in patched_supabase.calls if c["method"] == "update"]
-    assert len(updates[0]["payload"]["error_message"]) <= 1000
-
-
-def test_get_today_generation_returns_single_row(patched_supabase):
-    patched_supabase.set_today_rows(
-        [
-            {
-                "id": "gen-1",
-                "generated_on": today_utc(),
-                "status": "completed",
-                "provider": "openrouter",
-                "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
-                "generation_number": 1,
-                "created_at": "2026-01-01T00:00:00Z",
-                "completed_at": "2026-01-01T00:01:00Z",
-            }
-        ]
-    )
-
-    result = asyncio.run(get_today_generation("user-123"))
-    assert result is not None
-    assert result["status"] == "completed"
-
-    # select should target the ai_plan_generations table
-    selects = [c for c in patched_supabase.calls if c["method"] == "select"]
-    assert selects[0]["table"] == "ai_plan_generations"
-
-
-def test_get_today_generations_returns_all_today_rows(patched_supabase):
-    patched_supabase.set_today_rows([
-        {"id": "gen-1", "generation_number": 1, "status": "completed"},
-        {"id": "gen-2", "generation_number": 2, "status": "pending"},
-    ])
-
-    result = asyncio.run(get_today_generations("user-123"))
-    assert len(result) == 2
-    assert result[1]["id"] == "gen-2"
-
-
-def test_get_today_generation_returns_none_when_empty(patched_supabase):
-    patched_supabase.set_today_rows([])
-    assert asyncio.run(get_today_generation("user-123")) is None
-
-
-def test_completion_records_model_that_generated_advice(patched_supabase):
-    asyncio.run(complete_daily_generation("generation", {"ai_model": "openrouter/free"}))
-    updates = [call for call in patched_supabase.calls if call["method"] == "update"]
-    assert updates[0]["payload"]["model"] == "openrouter/free"
+def test_status_is_unlimited_bounded_and_scoped():
+    calls=[]
+    class Query:
+        def table(self,name):return self
+        def select(self,columns,**kwargs):calls.append(("columns",columns));assert kwargs["count"]=="exact";return self
+        def eq(self,key,value):calls.append((key,value));return self
+        def in_(self,*args):return self
+        def order(self,*args,**kwargs):return self
+        def limit(self,n):assert n==1;return self
+        def execute(self):return SimpleNamespace(count=15,data=[{"id":"latest","status":"completed"}])
+    with patch.object(audit,"get_supabase_client",return_value=Query()):
+        status=asyncio.run(audit.get_generation_status("user-a"))
+    assert status["unlimited"] is True and status["limit"] is None and status["remaining"] is None
+    assert status["used_count"]==15 and status["used_today"] is False
+    assert ("user_id","user-a") in calls
+    assert "payload" not in dict(calls)["columns"]

@@ -2,6 +2,9 @@ from starlette.concurrency import run_in_threadpool
 
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from app.services.optimization_engine import calculate_optimization_path
@@ -13,10 +16,8 @@ from app.middleware.auth import verify_user_token
 from app.services.user_service import save_financial_plan, get_user_plans, delete_plan
 from app.services import ai_financial_planner
 from app.services.ai_plan_limit import (
-    DAILY_AI_PLAN_LIMIT,
-    DailyPlanLimitExceeded,
     complete_daily_generation,
-    get_today_generations,
+    get_generation_status,
     release_failed_generation,
     reserve_daily_generation,
 )
@@ -26,6 +27,14 @@ app = FastAPI(
     description="API for optimizing financial decisions: debt repayment vs investing",
     version="1.0.0"
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def planning_validation_error_handler(request: Request, exc: RequestValidationError):
+    if request.url.path == "/api/plan/generate":
+        # Do not echo financial inputs, NaN, or infinity into JSON validation errors.
+        return JSONResponse(status_code=422, content={"detail": "Invalid financial inputs. Check loan amounts, field lengths, and numeric limits."})
+    return await request_validation_exception_handler(request, exc)
 
 import os
 
@@ -603,14 +612,7 @@ async def generate_financial_plan(
     request: PersonalizedPlanRequest,
     user_id: str = Depends(verify_user_token),
 ):
-    """
-    Generate an AI-assisted plan within the per-user UTC-day limit.
-
-    Requires a Supabase bearer token. Enforces the daily generation limit
-    server-side via the ai_plan_generations table, reserves a slot before
-    calling OpenRouter, and releases it if generation fails so provider errors
-    do not consume the user's daily quota.
-    """
+    """Generate an authenticated plan and track metadata without application quotas."""
     model = ai_financial_planner.DEFAULT_AI_MODEL
     generation_id = None
     try:
@@ -619,25 +621,21 @@ async def generate_financial_plan(
             model=model,
             request_payload=request.model_dump(mode="json"),
         )
-        print(f"[DEBUG] Generating AI plan for user={user_id}, model={model}")
+        print(f"[DEBUG] Generating AI plan model={model}")
 
         plan = await run_in_threadpool(ai_financial_planner.generate_ai_financial_plan, request)
 
         await complete_daily_generation(generation_id, plan.model_dump(mode="json"))
         return plan
-    except DailyPlanLimitExceeded as e:
-        raise HTTPException(status_code=429, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[ERROR] AI plan generation failed: {str(e)}")
+        print(f"[ERROR] AI plan generation failed: {type(e).__name__}")
         if generation_id:
             try:
                 await release_failed_generation(generation_id, str(e))
             except Exception as release_error:
-                print(f"[WARN] Failed to release AI generation reservation: {release_error}")
-        import traceback
-        traceback.print_exc()
+                print(f"[WARN] Failed to finalize generation metadata: {type(release_error).__name__}")
         if isinstance(e, ai_financial_planner.AIPlanError):
             raise HTTPException(status_code=e.status_code, detail=str(e))
         raise HTTPException(status_code=500, detail="AI plan generation is unavailable right now. Please try again later.")
@@ -645,17 +643,8 @@ async def generate_financial_plan(
 
 @app.get("/api/plan/generate/status")
 async def get_financial_plan_generation_status(user_id: str = Depends(verify_user_token)):
-    """Report whether the authenticated user has used today's AI plan generation."""
-    today_generations = await get_today_generations(user_id)
-    today = today_generations[-1] if today_generations else None
-    used_count = len(today_generations)
-    return {
-        "limit": DAILY_AI_PLAN_LIMIT,
-        "used_count": used_count,
-        "remaining": max(DAILY_AI_PLAN_LIMIT - used_count, 0),
-        "used_today": used_count >= DAILY_AI_PLAN_LIMIT,
-        "generation": today,
-    }
+    """Report bounded generation metadata; generating remains unlimited."""
+    return await get_generation_status(user_id)
 
 
 # ============= User-Scoped Data Endpoints =============

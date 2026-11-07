@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from typing import List, Optional, Literal
 from enum import Enum
 
 
@@ -116,12 +116,42 @@ class ETFAllocation(BaseModel):
     description: str
     risk_level: str
 
+class PlanningLoanData(LoanData):
+    """Bounded finite inputs for AI planning without changing other loan tools."""
+    model_config = ConfigDict(allow_inf_nan=False)
+    loan_name: str = Field(default="Loan", min_length=1, max_length=120)
+    principal: float = Field(ge=0, le=1e12)
+    minimum_payment: float = Field(ge=0, le=1e9)
+    term_months: Optional[int] = Field(default=None, gt=0, le=1200)
+
+
+class ExistingHolding(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+    ticker: str = Field(pattern=r"^[A-Z][A-Z0-9.-]{0,9}$")
+    current_value: float = Field(ge=0, le=1e12)
+
+    @field_validator("ticker", mode="before")
+    @classmethod
+    def normalize_ticker(cls, value):
+        return value.strip().upper() if isinstance(value, str) else value
+
+
+class LiquidityNeed(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+    amount: float = Field(gt=0, le=1e12)
+    months_until_needed: int = Field(ge=0, le=600, strict=True)
+    purpose: str = Field(min_length=1, max_length=160)
+
+
 class PersonalizedPlanRequest(BaseModel):
-    monthly_investment_amount: float = Field(..., gt=0, description="Amount available to invest monthly")
+    model_config = ConfigDict(allow_inf_nan=False)
+    existing_holdings: List[ExistingHolding] = Field(default_factory=list, max_length=20)
+    liquidity_needs: List[LiquidityNeed] = Field(default_factory=list, max_length=10)
+    monthly_investment_amount: float = Field(..., gt=0, le=1e9, description="Amount available to invest monthly")
     risk_tolerance: RiskTolerance = Field(default=RiskTolerance.MODERATE, description="Risk tolerance level")
     financial_goal: FinancialGoal = Field(default=FinancialGoal.WEALTH_BUILDING, description="Primary financial goal")
     time_horizon_years: int = Field(default=10, gt=0, le=50, description="Investment time horizon in years")
-    current_savings: float = Field(default=0.0, ge=0, description="Current savings/investment balance")
+    current_savings: float = Field(default=0.0, ge=0, le=1e12, description="Current savings/investment balance")
     has_emergency_fund: bool = Field(default=False, description="Whether user has 3-6 months emergency fund")
     # Paycheck allocation fields (all optional — enables waterfall mode when monthly_gross_income is set)
     monthly_gross_income: Optional[float] = Field(default=None, ge=0, description="Monthly gross income (enables paycheck allocation mode)")
@@ -131,10 +161,16 @@ class PersonalizedPlanRequest(BaseModel):
     current_emergency_fund: float = Field(default=0.0, ge=0, description="Current emergency fund balance")
     emergency_fund_months_target: int = Field(default=3, ge=1, le=12, description="Target months of expenses in emergency fund")
     # AI planner inputs (loans + optional extra factors)
-    loans: List[LoanData] = Field(default_factory=list, description="User loans to consider in the plan")
+    loans: List[PlanningLoanData] = Field(default_factory=list, max_length=50, description="User loans to consider in the plan")
     age: Optional[int] = Field(default=None, ge=13, le=100, description="User age, if provided")
     tax_filing_status: Optional[str] = Field(default=None, max_length=64, description="Optional tax filing status")
     notes: Optional[str] = Field(default=None, max_length=1000, description="Optional user-provided planning context")
+
+    @model_validator(mode="after")
+    def check_holdings_balance(self):
+        if sum(holding.current_value for holding in self.existing_holdings) > self.current_savings + .01:
+            raise ValueError("Existing holdings are included in current_savings and cannot exceed it")
+        return self
 
 class AdvisorCard(BaseModel):
     title: str
@@ -153,14 +189,16 @@ class MonthlyActionPlan(BaseModel):
     debt_extra_payment_amount: Optional[float] = None
     emergency_fund_amount: Optional[float] = None
     notes: List[str] = Field(default_factory=list)
+    liquidity_savings_amount: float = 0.0
 
 
 class SatelliteStockIdea(BaseModel):
+    sector: Optional[str] = None
+    as_of: Optional[str] = None
+    supporting_context: Optional[str] = None
     ticker: str
     name: str
-    # Note: no upper bound here on purpose. The AI model may return >10; the
-    # sanitizer clamps each idea down to <=10% so over-allocated output
-    # never fails validation before it can be corrected.
+    # Generated research ideas always have zero budget allocation.
     allocation_percent: float = Field(..., ge=0)
     monthly_amount: float = Field(..., ge=0)
     reason: str
@@ -197,5 +235,7 @@ class PersonalizedPlanResult(BaseModel):
     advisor_cards: List[AdvisorCard] = Field(default_factory=list)
     monthly_action_plan: Optional[MonthlyActionPlan] = None
     satellite_stock_ideas: List[SatelliteStockIdea] = Field(default_factory=list)
+    stock_idea_status: Literal["available", "unavailable"] = "unavailable"
+    stock_idea_message: Optional[str] = "No verified recent stock research idea is available."
     advisor_assumptions: Optional[AdvisorAssumptions] = None
     plan_source: str = Field(default="rule_based", description="ai | rule_based")
