@@ -52,6 +52,13 @@ def _set_cache(key: str, data: Dict) -> None:
         _cache[key] = (data, datetime.now())
 
 
+def get_cached_etf_data(tickers: List[str]) -> Dict:
+    """Read the existing batch cache only; never start a live quote download."""
+    key = f"batch_{'_'.join(sorted(tickers))}"
+    cached = _get_cached(key)
+    return dict(cached) if cached else {}
+
+
 def _batch_download_etfs(tickers: List[str]) -> Dict:
     """
     Download multiple ETFs in a single batch request to avoid rate limiting.

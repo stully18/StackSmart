@@ -20,6 +20,25 @@ Work on `dev`. Merge into `main` only on the user's explicit instruction.
 
 ## Implementation sequence
 
+## Two-agent implementation split
+
+### Agent 1: Backend and database
+
+Own backend schemas, planner/provider integration, unlimited generation tracking, SQL migration, and focused backend tests. Implement the shared input/output contract below. Review related database tables for RLS, grants, ownership, indexes, and unnecessary duplication; document broader improvements rather than performing unrelated table redesigns.
+
+### Agent 2: Frontend and user context
+
+Own frontend form, current context submission, result presentation, unlimited controls, TypeScript types, and focused frontend checks. Preserve auth loading before redirects and inspect the affected desktop/mobile flow. Coordinate contract questions with Agent 1.
+
+### Shared API contract
+
+- Add optional `existing_holdings: [{ticker, current_value}]` and `liquidity_needs: [{amount, months_until_needed, purpose}]` to `PersonalizedPlanRequest`; arrays default empty. Existing fields remain compatible.
+- Keep current result fields and add `stock_idea_status` (`available` or `unavailable`) plus optional `stock_idea_message`. `satellite_stock_ideas` contains at most one zero-allocation research idea with existing fields plus `sector`, `as_of`, and `supporting_context`.
+- Generation status reports `unlimited: true`, `limit: null`, `remaining: null`, and `used_today: false`; preserve a useful `used_count` and latest generation metadata without financial payloads.
+- Errors preserve the existing `detail` string contract and include a safe category/correlation reference in the message.
+
+After the two implementation agents finish, a separate review agent checks the complete diff for correctness, security, database integrity, and missing tests. The primary agent integrates changes, resolves findings, verifies live provider behavior where access allows, and makes one task commit on `dev`.
+
 ### 1. Reproduce and diagnose the provider call
 
 - Verify the target Railway environment, deployed revision, AI enable flag, exact model, fallback setting, and presence of the backend-only API key without exposing secret values.
@@ -74,3 +93,17 @@ A live synthetic-user request uses the exact Nemotron model, produces a validate
 - OpenRouter model endpoints: https://openrouter.ai/api/v1/models/nvidia/nemotron-3-ultra-550b-a55b:free/endpoints
 - OpenRouter API reference: https://openrouter.ai/docs/api/reference/overview
 - Vanguard VXUS: https://advisors.vanguard.com/investments/products/vxus/vanguard-total-international-stock-etf
+
+## Implementation and verification record
+
+The two implementation sections above were assigned to separate backend/database and frontend agents. An independent security/code reviewer checked the implementation and its corrective changes, closing three findings before commit. The resulting implementation keeps one prompt and the exact free Nemotron model, supports structured current holdings and upcoming spending, validates proposed ETF weights, and returns a verified zero-budget stock research idea or an explicit unavailable state. Application quotas are removed; the generation ledger records metadata rather than new copies of financial inputs/results.
+
+- The final 62 focused backend tests passed, covering provider parsing/errors, risk/goal and liquidity constraints, budget reconciliation, UUID tracking beyond ten requests, concurrent IDs, bounded user-scoped status, authenticated endpoints, safe invalid-input responses, valid paid/deferred saved loans, non-retrying short storage transports, cached-only quotes, and existing stock-query behavior. One upstream TestClient deprecation warning remains.
+- Eight focused frontend tests passed. Frontend checks cover validated current-context submission, unlimited controls, result states, error recovery, and auth routing. TypeScript, production build, and direct desktop/mobile Playwright checks passed, including twelve successive submissions. The Playwright skill was unavailable; installed Playwright tooling was used. The browser checks used mocked auth/API responses and synthetic data, not a deployed backend.
+- The migration was executed twice against isolated PostgreSQL via PGlite after migrations 003 and 004. It preserved a legacy financial payload row, allowed twelve additional same-user/day service-role inserts, kept RLS enabled, and denied CRUD grants to anon/authenticated.
+- Live exact-model checks succeeded for a minimal message, forced function call, and original full advice schema. Updated-schema synthetic calls with illustrative market quotes succeeded for long/aggressive and short/conservative inputs (about 27 and 20 seconds). One short/conservative response was rejected by portfolio validation before a successful manual rerun; provider output is not guaranteed valid and failures remain explicit.
+- Vercel MCP read access and Railway CLI access worked. The existing production services are on `main`; this task does not merge, publish, or deploy them. Supabase MCP returned Unknown tool; the Supabase CLI lacked an access token and Railway had no database connection string. An authenticated service-role REST schema probe succeeded, but cannot verify database policies or apply DDL. The new migration remains unapplied to the hosted project.
+- The live stock-picks table was empty. The implementation therefore cannot produce a supported live stock idea until a recent eligible screen exists; no stock data was fabricated.
+- A separate live tool-call check supplied an explicitly synthetic stock-screen fixture and illustrative quotes. Nemotron returned one validated research idea with zero allocated dollars in about 14 seconds. This validates the stock response contract, not the availability of real market evidence.
+- After the review fixes, a live synthetic capital-preservation request validated in about 19 seconds with 90% defensive exposure (80% SGOV, 10% BND, 10% VTI), respecting the server's mandatory defensive minimum. No live quote refresh was performed during generation.
+- The selected free provider's published restriction on personal/confidential data makes this a synthetic-testing integration. Review provider eligibility before accepting real customer financial information. See the database review for launch recommendations and the separate live-schema audit still required.

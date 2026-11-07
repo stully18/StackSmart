@@ -54,7 +54,7 @@ export async function optimizeFinancialPath(
 
 async function planningFetch(url: string, options: RequestInit): Promise<Response> {
   try {
-    return await fetch(url, { ...options, signal: AbortSignal.timeout(90000) });
+    return await fetch(url, { ...options, signal: AbortSignal.timeout(120000) });
   } catch (error) {
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
       throw new Error('Plan generation took too long. Please try again shortly.');

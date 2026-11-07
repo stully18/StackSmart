@@ -122,10 +122,11 @@ export interface DebtPriority {
 }
 
 export interface PersonalizedPlanGenerationStatus {
-  limit: number;
+  unlimited: true;
+  limit: null;
   used_count?: number;
-  remaining?: number;
-  used_today: boolean;
+  remaining: null;
+  used_today: false;
   generation: null | {
     id: string;
     generated_on: string;
@@ -190,16 +191,20 @@ export interface MonthlyActionPlan {
   etf_investing_amount?: number | null;
   debt_extra_payment_amount?: number | null;
   emergency_fund_amount?: number | null;
+  liquidity_savings_amount?: number | null;
   notes: string[];
 }
 
 export interface SatelliteStockIdea {
   ticker: string;
   name: string;
-  allocation_percent: number; // 0..10
+  allocation_percent: number; // Research only: 0
   monthly_amount: number;
   reason: string;
   risk_note: string;
+  sector: string;
+  as_of: string;
+  supporting_context: string;
 }
 
 export interface AdvisorAssumptions {

@@ -52,7 +52,7 @@
 - Keep business logic in `services` where existing patterns allow; keep provider I/O behind existing client, fetcher, or cache seams.
 - Authentication is applied to selected endpoints, not globally. Check the route’s dependencies before changing its behavior or describing it as protected.
 - Treat Plaid access tokens, Supabase service-role credentials, and provider API keys as secrets. Review token ownership and authorization when changing Plaid flows.
-- AI plan generation has per-user daily limits and reserves a slot before calling Gemini. Preserve failure cleanup and UTC-day behavior.
+- AI plan generation uses OpenRouter with the fixed free Nemotron model and has no application per-user generation quota. Preserve authentication, user ownership, UUID-based generation tracking, and safe failure diagnostics. Provider limits still apply; do not reintroduce application quotas without a user request.
 - Stock of the Day jobs run separately from FastAPI. Preserve their date, trading-day, idempotency, and persistence behavior when changing them.
 
 ## Database and Migrations

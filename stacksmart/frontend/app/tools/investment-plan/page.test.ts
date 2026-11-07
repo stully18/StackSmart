@@ -35,7 +35,7 @@ describe('InvestmentPlanPage auto-generation behavior', () => {
   });
 
   it('sends authenticated ai planning inputs without Gemini or routine quota copy', () => {
-    expect(source).toContain('fetchPlanGenerationStatus');
+    expect(source).not.toContain('fetchPlanGenerationStatus');
     expect(source).toContain('generatePersonalizedPlan');
     expect(source).toContain('session?.access_token');
     expect(source).toContain('loans.map');
@@ -44,9 +44,11 @@ describe('InvestmentPlanPage auto-generation behavior', () => {
     expect(source).not.toContain('Gemini');
     expect(source).not.toContain('generations per day');
     expect(source).not.toContain('generations remaining today');
-    // Daily limit still blocks via the used-today banner/disabled button.
-    expect(source).toContain('Daily AI Limit Reached');
-    expect(source).toContain('used_today');
+    expect(source).not.toContain('Daily AI Limit Reached');
+    expect(source).not.toContain('used_today');
+    expect(source).toContain('disabled={loading || inputsLoading || !loansLoaded}');
+    expect(source).toContain('planningContext(holdings, liquidityNeeds)');
+    expect(source).not.toContain('time_horizon_years: 10,\n        monthly_gross_income');
   });
 
   it('renders the AI advisor dashboard above the ETF allocation sections', () => {
@@ -63,8 +65,12 @@ describe('InvestmentPlanPage auto-generation behavior', () => {
     expect(source).toContain('ETF Investing');
     expect(source).toContain('Extra Debt Payoff');
     expect(source).toContain('Emergency Fund');
-    expect(source).toContain('Optional Satellite Stock Ideas');
+    expect(source).toContain('One Stock to Research');
     expect(source).toContain('Keep diversified ETFs as the core');
+    expect(source).toContain("plan.stock_idea_status === 'available'");
+    expect(source).toContain('idea.supporting_context');
+    expect(source).toContain('idea.as_of');
+    expect(source).toContain('Research only - $0 from your monthly budget');
     // Renamed, non-confidence assumptions heading.
     expect(source).toContain('Plan Assumptions');
     // Confidence scoring is no longer rendered anywhere.
@@ -82,7 +88,7 @@ describe('InvestmentPlanPage auto-generation behavior', () => {
 
   it('uses the renamed ETF + reasoning headings', () => {
     expect(source).toContain('Core ETF Allocation Details');
-    expect(source).toContain('investable core behind the advisor recommendations');
+    expect(source).toContain('percentages total 100% of the ETF portion');
     expect(source).toContain('Why This Advisor Plan?');
     expect(source).not.toContain('Why This Portfolio?');
     expect(source).not.toContain('Your Portfolio Allocation');
